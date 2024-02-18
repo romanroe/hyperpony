@@ -1,0 +1,44 @@
+{% load hyperpony %}
+
+<div>
+
+    <div class="m-2">
+        <input class="form-control"
+               placeholder="Filter..."
+               name="filter_text"
+               value="{{ filter_text }}"
+               hx-get="{{ url }}"
+               hx-trigger="keyup changed delay:500ms"
+               hx-select="#person-list"
+               hx-target="#person-list"
+        />
+    </div>
+
+    <div id="person-list" class="list-group list-group-flush">
+
+        {% for person in persons %}
+            <div>
+                <a href="#"
+                   _="on click take .active from #person-list > .list-group-item"
+                   hx-get="{% url "address-book-detail-element" person.id %}"
+                   hx-target="#detail-element-wrapper"
+                   hx-swap="innerHTML"
+                   class="list-group-item list-group-item-action {% if person.id == person_id %}active{% endif %}"
+                >
+                    {{ person.first_name }} {{ person.last_name }}
+                </a>
+            </div>
+        {% endfor %}
+
+        {% if has_more_pages %}
+            <div hx-get="{{ url }}?page={{ page|add:1 }}"
+                 hx-trigger="intersect once"
+                 hx-select="#person-list>*"
+                 hx-target="this"
+                 hx-swap="outerHTML"
+            ></div>
+        {% endif %}
+
+    </div>
+
+</div>

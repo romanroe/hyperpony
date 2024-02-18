@@ -1,0 +1,118 @@
+[tool.poetry]
+name = "hyperpony"
+version = "0.49.0"
+description = "Django library for building web applications with htmx"
+authors = ["Roman Roelofsen <romanroe@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/romanroe/dfv"
+keywords = ["django", "python"]
+include = ["hyperpony"]
+
+#[tool.poetry.extras]
+#docs = ["Sphinx", "linkify-it-py", "myst-parser", "furo", "sphinx-copybutton", "sphinx-autobuild", "toml"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.dependencies]
+python = "~3.10.0"
+django = ">=4,<6"
+django-htmx = "^1.14.0"
+lxml = "^5.1.0"
+wrapt = "^1.15.0"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.2.2"
+whitenoise = "^6.5.0"
+django-debug-toolbar = "*"
+django-browser-reload = "^1.7.0"
+django-widget-tweaks = "^1.4.12"
+django-extensions = "^3.1.5"
+django-click = "^2.3.0"
+mypy = "^1.8.0"
+coverage = "^7.2.1"
+pytest = "^8.0.1"
+pytest-django = "^4.5.2"
+pytest-xdist = "^3.3.1"
+pytest-watcher = "^0.3.4"
+icecream = "^2.1.3"
+
+#[tool.poetry.group.docs]
+#optional = true
+
+#[tool.poetry.group.docs.dependencies]
+#mkdocs = "*"
+
+
+[tool.poe.tasks]
+test = "pytest"
+testwatch = "ptw ."
+lint = "ruff check ."
+format = "ruff format ."
+mypy = "mypy ."
+check = ["format", "test", "mypy", "lint"]
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+exclude = [
+    "**/migrations/*",
+]
+
+[tool.ruff.lint]
+select = [
+    "F", # Pyflakes
+    "E", # pycodestyle error
+    "W",
+    "N", # pep8-naming
+    "DJ", # Flake8 Django
+    "I", # isort
+    "RET", # return type
+    "SLF001", # private-member-access
+    "RUF100", # unused-noqa
+]
+ignore = [
+    "E501", # handled by Formatter
+    "RET504",
+    "RET501",
+    "I001",
+]
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"
+docstring-code-format = true
+skip-magic-trailing-comma = false
+
+[tool.pytest.ini_options]
+python_files = "tests.py test_*.py *_tests.py *_test.py"
+DJANGO_SETTINGS_MODULE = "project.settings"
+FAIL_INVALID_TEMPLATE_VARS = true
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+norecursedirs = [
+    ".venv",
+    "*_cache",
+    "build",
+    "data"
+]
+
+[tool.pytest-watcher]
+now = true
+delay = 0.2
+runner_args = ["--no-header", "--lf"]
+
+[tool.mypy]
+warn_return_any = false
+warn_unused_configs = true
+show_error_context = true
+ignore_missing_imports = true
+check_untyped_defs = true
+plugins = []
+exclude = [
+    "migrations/",
+    "docs",
+]

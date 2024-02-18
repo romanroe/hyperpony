@@ -1,0 +1,9 @@
+
+/.venv
+/data
+/dist
+/docs/build
+
+/.idea
+#/.idea/tasks.xml
+#/.idea/ruff.xml

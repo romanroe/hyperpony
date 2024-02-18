@@ -1,0 +1,54 @@
+{% load widget_tweaks %}
+
+<form hx-post="{{ url }}" hx-swap="merge" novalidate>
+    <div>
+
+        {% with form.f1 as field %}
+            <div class="row" hx-patch="{{ url }}" hx-trigger="input">
+                <div class="col">
+                    {{ field.label }}
+                </div>
+                <div class="col" id="field_f1">
+
+                    {{ field|add_class:"form-control" }}
+                    <div>
+                        {{ field.errors }}
+                    </div>
+                </div>
+
+            </div>
+        {% endwith %}
+
+        {% with form.f2 as field %}
+            <div class="row">
+                <div class="col">
+                    {{ field.label }}
+                </div>
+                <div class="col">
+                    {{ field|add_class:"form-control" }}
+                    <div>
+                        {{ field.errors }}
+                    </div>
+                </div>
+            </div>
+        {% endwith %}
+
+        {% if form.f1.value|length > 0 %}
+            {% with form.names as field %}
+                <div class="row">
+                    <div class="col">
+                        {{ field.label }}
+                    </div>
+                    <div class="col">
+                        {{ field|add_class:"form-control" }}
+                        <div>
+                            {{ field.errors }}
+                        </div>
+                    </div>
+                </div>
+            {% endwith %}
+        {% endif %}
+
+        <button>Submit</button>
+    </div>
+</form>
