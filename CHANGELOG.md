@@ -1,5 +1,7 @@
 # Changelog
 
+<!-- releases -->
+
 ## 0.48.0 (2024-02-18)
 
 - renamed project from DFV to Hyperpony

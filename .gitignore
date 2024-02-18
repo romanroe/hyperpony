@@ -5,5 +5,7 @@
 /docs/build
 
 /.idea
-#/.idea/tasks.xml
-#/.idea/ruff.xml
+
+# temporarily
+/docs
+mkdocs.yml
