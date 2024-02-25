@@ -2,11 +2,13 @@
 
 <!-- releases -->
 
-## 0.50.0 (2024-02-18)
+## 0.50.1 (2024-02-25)
+
+- fixed Python dependency version
+
+## 0.50.0 (2024-02-25)
 
 - middleware is now async aware
-
-## 0.49.0 (2024-02-18)
 
 ## 0.48.0 (2024-02-18)
 
