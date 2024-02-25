@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hyperpony"
-version = "0.49.0"
+version = "0.50.0"
 description = "Django library for building web applications with htmx"
 authors = ["Roman Roelofsen <romanroe@gmail.com>"]
 license = "MIT"
