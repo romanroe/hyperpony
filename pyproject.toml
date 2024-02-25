@@ -58,6 +58,7 @@ lint = "ruff check ."
 format = "ruff format ."
 mypy = "mypy ."
 check = ["format", "test", "mypy", "lint"]
+docswatch = "mkdocs serve"
 
 [tool.ruff]
 line-length = 88
@@ -100,9 +101,17 @@ filterwarnings = [
 ]
 norecursedirs = [
     ".venv",
-    "*_cache",
+    ".git",
+    ".idea",
+    "data",
+    "dist",
+    "docs",
+    "docs_backup",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
     "build",
-    "data"
 ]
 
 [tool.pytest-watcher]

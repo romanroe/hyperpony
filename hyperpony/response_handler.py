@@ -3,7 +3,7 @@ from typing import Callable, Literal, Optional, TypeAlias
 from django.http import HttpRequest, HttpResponse
 from django_htmx.http import push_url
 
-from hyperpony.htmx import swap_oob
+from hyperpony.htmx import enrich_response_with_oob_contents, swap_oob
 from hyperpony.view_stack import get_view_fn_call_stack_from_request_or_raise
 
 
@@ -27,6 +27,8 @@ def process_response(request: HttpRequest, response: HttpResponse) -> HttpRespon
     for handler in handlers:
         result = handler(response)
         response = result if result is not None else response
+
+    enrich_response_with_oob_contents(response)
     return response
 
 

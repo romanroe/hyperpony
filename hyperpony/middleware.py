@@ -1,18 +1,24 @@
-from django.http import HttpResponse
+from asyncio import iscoroutinefunction
 
-from hyperpony.htmx import enrich_response_with_oob_contents
+from django.utils.decorators import sync_and_async_middleware
+
 from hyperpony.response_handler import process_response
 
 
-class HyperponyMiddleware:
-    def __init__(self, get_response):
-        self.get_response = get_response
+@sync_and_async_middleware
+def HyperponyMiddleware(get_response):  # noqa: N802
+    if iscoroutinefunction(get_response):
 
-    def __call__(self, request) -> HttpResponse:
-        response: HttpResponse = self.get_response(request)
-        response = process_response(request, response)
-        enrich_response_with_oob_contents(response)
-        return response
+        async def middleware(request):
+            response = await get_response(request)
+            response = process_response(request, response)
+            return response
 
-    def process_view(self, request, view_func, view_args, view_kwargs):
-        pass
+    else:
+
+        def middleware(request):
+            response = get_response(request)
+            response = process_response(request, response)
+            return response
+
+    return middleware

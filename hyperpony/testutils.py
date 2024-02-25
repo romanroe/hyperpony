@@ -23,5 +23,4 @@ def create_resolved_request(
 def call_with_middleware(rf: RequestFactory, view_fn, *args, **kwargs) -> HttpResponse:
     m = HyperponyMiddleware(lambda r: view_fn(r, *args, **kwargs))
     request = rf.get("/")
-    m.process_view(request, view_fn, args, kwargs)
     return m(request)
