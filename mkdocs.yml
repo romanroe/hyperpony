@@ -1,0 +1,89 @@
+site_name: Hyperpony
+site_description: Django library for building web applications with htmx
+repo_name: romanroe/hyperpony
+repo_url: https://github.com/romanroe/hyperpony
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2024 Roman Roelofsen
+
+nav:
+  - Welcome: index.md
+  - User Guide:
+    - guide/index.md
+  - Changelog: changelog.md
+
+theme:
+  name: material
+  custom_dir: docs/.overrides
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - content.action.edit
+    - toc.integrate
+    - toc.follow
+    - navigation.path
+    - navigation.top
+    - navigation.tabs
+    - navigation.footer
+  font:
+    text: Inter
+    monospace: Fira Mono
+  favicon: static/favicon.svg
+  logo: static/logo.svg
+
+  # This is a bit of a hack.  We don't actually want this toggle at all,
+  # it's all based on media queries.  But to abuse the mkdocs theme it
+  # still uses the toggles to trigger all the default logic.  We will
+  # then hide this selector though with CSS.  The auto updating then
+  # happens in palette.html with JavaScript.
+  palette:
+    scheme: default
+    primary: custom
+    accent: custom
+
+markdown_extensions:
+  - attr_list
+  - admonition
+  - def_list
+  - pymdownx.details
+  - pymdownx.keys
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - mdx_gh_links:
+      user: romanroe
+      repo: hyperpony
+#  - pymdownx.emoji:
+#      emoji_index: !!python/name:materialx.emoji.twemoji
+#      emoji_generator: !!python/name:materialx.emoji.to_svg
+
+plugins:
+  - search
+#  - mkdocs-simple-hooks:
+#      hooks:
+#        on_post_build: "docs.hooks:copy_get"
+  - mkdocs-version-annotations:
+      version_added_title: 'new in **\1**'
+      version_changed_title: 'changed in **\1**'
+      version_removed_title: 'removed in **\1**'
+  - include-markdown:
+      preserve_includer_indent: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/romanroe
+      name: Follow @romanroe on GitHub
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/@romanroe
+      name: Follow @romanroe on Twitter
+#    - icon: fontawesome/brands/discord
+#      link: https://discord.gg/TODO
+#      name: Discuss Hyperpony on Discord
+
+#extra_css:
+#  - static/extra.css
+
+dev_addr: '127.0.0.1:9000'
