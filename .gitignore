@@ -6,7 +6,5 @@
 
 /.idea
 
-# temporarily
-/docs
 /docs_backup
 mkdocs.yml
