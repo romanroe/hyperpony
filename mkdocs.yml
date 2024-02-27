@@ -6,9 +6,10 @@ edit_uri: edit/main/docs/
 copyright: Copyright &copy; 2024 Roman Roelofsen
 
 nav:
-  - Welcome: index.md
+  - Installation: index.md
   - User Guide:
-    - guide/index.md
+    - guide/000_about.md
+    - guide/010_views.md
   - Changelog: changelog.md
 
 theme:
