@@ -13,7 +13,7 @@ from hyperpony.htmx import swap_oob
 def level1_page(request: HttpRequest):
     return render(
         request,
-        "elements/Level1Page.html",
+        "playground/elements/Level1Page.html",
         {
             "timestamp": datetime.now().microsecond,
             "level2_element": level2_element(request, source="level1_page"),
@@ -25,7 +25,7 @@ def level1_page(request: HttpRequest):
 def level2_element(request: HttpRequest, source="level2"):
     return render(
         request,
-        "elements/Level2Element.html",
+        "playground/elements/Level2Element.html",
         {
             "timestamp": datetime.now().microsecond,
             "source": source,
@@ -43,7 +43,7 @@ def level3a_element(
 ):
     response = render(
         request,
-        "elements/Level3AElement.html",
+        "playground/elements/Level3AElement.html",
         {
             "timestamp": datetime.now().microsecond,
             "source": source,
@@ -70,7 +70,7 @@ def level3a_element(
 def level3b_element(request: HttpRequest, source=""):
     return render(
         request,
-        "elements/Level3BElement.html",
+        "playground/elements/Level3BElement.html",
         {"timestamp": datetime.now().microsecond, "source": source},
     )
 

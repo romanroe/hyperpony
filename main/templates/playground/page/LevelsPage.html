@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Django Function Views Demos - Page
+{% endblock %}
+
+{% block body %}
+    <h1>Level 1</h1>
+    {{ timestamp }}
+
+    <div id="level2">
+        <h2>Level 2</h2>
+        {{ timestamp }}
+        <br>
+        {{ source }}
+
+        <div id="level3" class="row">
+            <div id="level3a" class="col">
+                <h3>Level 3 A</h3>
+                {{ timestamp }}
+                <br>
+                {{ source }}
+
+                <div hx-swap="outerHTML">
+                    <div>
+                        <button hx-post="{{ url }}"
+                                hx-target="body"
+                                name="source"
+                                value="page">
+                            Refresh Page
+                        </button>
+                    </div>
+                    <div>
+                        <button hx-post="{{ url }}"
+                                hx-target="#level2"
+                                hx-select="#level2"
+                                name="source"
+                                value="level2">
+                            Refresh 2
+                        </button>
+                    </div>
+                    <div>
+                        <button hx-post="{{ url }}"
+                                hx-target="#level3a"
+                                hx-select="#level3a"
+                                name="source"
+                                value="level3a">
+                            Refresh 3A
+                        </button>
+                    </div>
+                    <div>
+                        <button hx-post="{{ url }}"
+                                hx-target="#level3"
+                                hx-select="#level3"
+                                name="source"
+                                value="level3ab">
+                            Refresh 3A + 3B
+                        </button>
+                    </div>
+                    <div>
+                        <button hx-post="{{ url }}"
+                                hx-target="#level3a"
+                                hx-select="#level3b"
+                                name="source"
+                                value="replace">
+                            Replace with 3B
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="level3b" class="col">
+                <h3>Level 3 B</h3>
+                {{ timestamp }}
+                <br>
+                {{ source }}
+            </div>
+        </div>
+
+    </div>
+
+{% endblock %}

@@ -4,7 +4,8 @@ from django.urls import include, path
 # global URLs
 urlpatterns = [
     # Demos
-    path("elements/", include("main.views.elements")),
+    path("elements/", include("main.views.playground.elements")),
+    path("page/", include("main.views.playground.page")),
     path("form/", include("main.views.form")),
     path("demos/", include("main.views.demos")),
     path("demo_address_book/", include("demo_address_book.views")),
