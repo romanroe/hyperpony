@@ -1,15 +1,18 @@
-from typing import Any
+from typing import Any, TypeVar, Callable
 
-from django.http import HttpRequest, HttpResponse, HttpResponseBase, QueryDict
+from django.http import HttpRequest, HttpResponse, HttpResponseBase
 from django.template.response import TemplateResponse
 from django.utils.safestring import mark_safe, SafeString
 
 
-def querydict_key_removed(querydict: dict, key) -> QueryDict:
-    temp = QueryDict(mutable=True)
-    temp.update(querydict)
-    del temp[key]
-    return temp
+VIEW_FN = TypeVar("VIEW_FN", bound=Callable[..., HttpResponse])
+
+
+# def querydict_key_removed(querydict: dict, key) -> QueryDict:
+#     temp = QueryDict(mutable=True)
+#     temp.update(querydict)
+#     del temp[key]
+#     return temp
 
 
 def _get_request_from_args(args: list[Any]) -> HttpRequest:

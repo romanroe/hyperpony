@@ -7,7 +7,7 @@ import hyperpony
 from hyperpony.testutils import create_resolved_request
 from hyperpony.view_stack import (
     get_view_fn_call_stack_from_request,
-    is_view_fn_stack_at_root,
+    is_view_stack_at_root,
 )
 
 
@@ -63,7 +63,7 @@ def test_call_stack(rf: RequestFactory):
 def test_is_view_fn_target():
     @hyperpony.view()
     def view1(request):
-        assert is_view_fn_stack_at_root(request)
+        assert is_view_stack_at_root(request)
         return HttpResponse("")
 
     view1(create_resolved_request(view1))
@@ -72,13 +72,13 @@ def test_is_view_fn_target():
 def test_is_view_fn_target_nested_view(rf: RequestFactory):
     @hyperpony.view()
     def view1(request):
-        assert is_view_fn_stack_at_root(request)
+        assert is_view_stack_at_root(request)
         view2(request)
         return HttpResponse("")
 
     @hyperpony.view()
     def view2(request):
-        assert not is_view_fn_stack_at_root(request)
+        assert not is_view_stack_at_root(request)
         return HttpResponse("")
 
     urlpatterns = (path("view/", view1, name="a view"),)
@@ -109,7 +109,7 @@ def test_is_view_fn_target_nested_view_ignore_target(rf: RequestFactory):
 
 def test_is_view_fn_target_raw_view(rf: RequestFactory):
     def view1(request):
-        assert is_view_fn_stack_at_root(request)
+        assert is_view_stack_at_root(request)
         return HttpResponse("")
 
     urlpatterns = (path("view/", view1, name="a view"),)

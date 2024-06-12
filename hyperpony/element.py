@@ -4,7 +4,8 @@ from typing import Any, Callable, cast, Optional
 
 from django.http import HttpRequest, HttpResponse, HttpResponseBase
 from django.views import View
-from django_htmx.http import reswap, retarget
+from django_htmx.http import reswap as htmx_reswap
+from django_htmx.http import retarget as htmx_retarget
 
 from hyperpony.utils import is_response_processable, response_to_str
 from hyperpony.view import view, VIEW_FN, ViewResponse
@@ -85,9 +86,9 @@ class ElementResponse(ViewResponse):
 
 
 def body_response(response: HttpResponse, hx_swap="outerHTML") -> HttpResponse:
-    response = retarget(response, "body")
-    response = reswap(response, cast(Any, hx_swap))
-    return ElementResponse(response).as_response()
+    response = htmx_retarget(response, "body")
+    response = htmx_reswap(response, cast(Any, hx_swap))
+    return response
 
 
 def element(

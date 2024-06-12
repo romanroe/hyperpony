@@ -20,11 +20,11 @@ from typing import (
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.http import HttpRequest, HttpResponse, QueryDict
+from django.utils.decorators import method_decorator
 from django.views import View
 
-from hyperpony.utils import _get_request_from_args, querydict_key_removed
-
-VIEW_FN = TypeVar("VIEW_FN", bound=Callable[..., HttpResponse])
+from hyperpony.utils import _get_request_from_args, VIEW_FN
+from hyperpony.view_stack import is_view_stack_at_root, view_stack
 
 
 def inject_params() -> Callable[[VIEW_FN], VIEW_FN]:
@@ -49,11 +49,12 @@ def inject_params() -> Callable[[VIEW_FN], VIEW_FN]:
 
             return fn(*args, **kwargs)
 
-        return cast(VIEW_FN, inner)
+        return cast(VIEW_FN, view_stack()(inner))
 
     return decorator
 
 
+@method_decorator(view_stack(), name="dispatch")
 class InjectParams(View):
     _params_view_parameters: ClassVar[list["InjectedParam"]]
 
@@ -71,12 +72,13 @@ class InjectParams(View):
 
         return super().__new__(cls)
 
-    def setup(self, request, *args, **kwargs):
-        super().setup(request, *args, **kwargs)
+    def dispatch(self, request, *args, **kwargs):
         for p in self.__class__._params_view_parameters:  # noqa: SLF001
             value = p.get_value([request], kwargs)
             print(value)
             setattr(self, p.name, value)
+
+        return super().dispatch(request, *args, **kwargs)
 
 
 @dataclass
@@ -148,7 +150,8 @@ def _setup_fn_injected_param(
 class QueryParam(InjectedParam):
     query_param_name: Optional[str] = dataclasses.field(default=None)
     default: Any = dataclasses.field(default=None)
-    consume: bool = dataclasses.field(default=True)
+    # consume: bool = dataclasses.field(default=True)
+    ignore_view_stack: bool = dataclasses.field(default=False)
     methods: typing.Iterable[
         typing.Literal["GET", "POST", "PUT", "DELETE", "PATCH", "__all__"]
     ] = dataclasses.field(default=("GET",))
@@ -190,20 +193,24 @@ class QueryParam(InjectedParam):
 
         return combined_qd
 
-    def _consume_param(self, request: HttpRequest):
-        if self.query_param_name in request.GET:
-            request.GET = querydict_key_removed(
-                cast(Any, request.GET), self.query_param_name
-            )
-        elif self.query_param_name in request.POST:
-            request.POST = querydict_key_removed(
-                cast(Any, request.POST), self.query_param_name
-            )
+    # def _consume_param(self, request: HttpRequest):
+    #     if self.query_param_name in request.GET:
+    #         request.GET = querydict_key_removed(
+    #             cast(Any, request.GET), self.query_param_name
+    #         )
+    #     elif self.query_param_name in request.POST:
+    #         request.POST = querydict_key_removed(
+    #             cast(Any, request.POST), self.query_param_name
+    #         )
 
     def get_value(self, args: Any, kwargs: dict[str, Any]):
         request = _get_request_from_args(args)
         lookup_dict = self._create_lookup_dict(request)
-        values = lookup_dict.get(self.query_param_name, None)
+
+        if self.ignore_view_stack or is_view_stack_at_root(request):
+            values = lookup_dict.get(self.query_param_name, None)
+        else:
+            values = None
 
         if values is None:
             if self.default is not None:
@@ -215,8 +222,8 @@ class QueryParam(InjectedParam):
                     f"No value found for request parameter '{self.query_param_name}'"
                 )
 
-        if self.consume:
-            self._consume_param(request)
+        # if self.consume:
+        #     self._consume_param(request)
 
         return _convert_value_to_type(values, self.target_type)
 
@@ -231,13 +238,15 @@ def param(
         typing.Literal["GET", "POST", "PUT", "DELETE", "PATCH", "__all__"]
     ] = ("__all__",),
     parse_form_urlencoded_body: bool = True,
-    consume=True,
+    # consume=True,
+    ignore_view_stack=False,
 ) -> T:
     return cast(
         T,
         QueryParam(
             default=default,
-            consume=consume,
+            # consume=consume,
+            ignore_view_stack=ignore_view_stack,
             methods=methods,
             parse_form_urlencoded_body=parse_form_urlencoded_body,
         ),

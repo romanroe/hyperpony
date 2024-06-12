@@ -4,7 +4,7 @@ from django.http import HttpRequest
 from django.shortcuts import render
 from django.urls import path
 
-from hyperpony import element, is_post, view
+from hyperpony import element, view, param
 from hyperpony.element import body_response
 from hyperpony.htmx import swap_oob
 
@@ -39,7 +39,7 @@ def level2_element(request: HttpRequest, source="level2"):
 def level3a_element(
     request: HttpRequest,
     source="level3a",
-    # action=param("", consume=False),
+    action=param("", methods=["POST"]),
 ):
     response = render(
         request,
@@ -51,16 +51,16 @@ def level3a_element(
         },
     )
 
-    match is_post(request), request.POST:
-        case True, {"action_page": _}:
+    match action:
+        case "page":
             return body_response(level1_page(request))
-        case True, {"action": "2"}:
+        case "2":
             return swap_oob(response, level2_element(request, source="level3a_element"))
-        case True, {"action": "3a_3b"}:
+        case "3a_3b":
             return swap_oob(
                 response, level3b_element(request, source="level3a_element")
             )
-        case True, {"action": "replace"}:
+        case "replace":
             return level3b_element(request, "replace")
 
     return response

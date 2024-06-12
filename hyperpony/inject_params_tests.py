@@ -262,40 +262,30 @@ def test_function_call_kwarg_overrides_param(rf: RequestFactory):
     viewfn(rf.get("/?p1=a"), p1="b")
 
 
-def test_param_consume_true(rf: RequestFactory):
+def test_param_view_stack(rf: RequestFactory):
     @inject_params()
-    def viewfn(request, p1: str = param()):
+    def view1(request, p1: str = param()):
         assert p1 == "a"
-        assert "p1" not in request.GET
+        return view2(request)
 
-    viewfn(rf.get("/?p1=a"))
-
-
-def test_param_consume_false(rf: RequestFactory):
     @inject_params()
-    def viewfn(request, p1: str = param(consume=False)):
-        assert p1 == "a"
-        assert "p1" in request.GET
+    def view2(request, p1: str = param(default="b")):
+        assert p1 == "b"
 
-    viewfn(rf.get("/?p1=a"))
+    view1(rf.get("/?p1=a"))
 
 
-def test_param_consume_get(rf: RequestFactory):
+def test_param_view_stack_ignore(rf: RequestFactory):
     @inject_params()
-    def viewfn(request, p1: str = param()):
+    def view1(request, p1: str = param()):
         assert p1 == "a"
-        assert "p1" not in request.GET
+        return view2(request)
 
-    viewfn(rf.get("/?p1=a"))
-
-
-def test_param_consume_post(rf: RequestFactory):
     @inject_params()
-    def viewfn(request, p1: str = param(methods=["POST"])):
+    def view2(request, p1: str = param(ignore_view_stack=True)):
         assert p1 == "a"
-        assert "p1" not in request.POST
 
-    viewfn(rf.post("/", {"p1": "a"}))
+    view1(rf.get("/?p1=a"))
 
 
 def test_auto_default_value(rf: RequestFactory):
@@ -308,7 +298,7 @@ def test_auto_default_value(rf: RequestFactory):
 
 
 def test_class_view(rf: RequestFactory):
-    class V(InjectParams, View):
+    class V(InjectParams):
         p1: str = param()
 
         def get(self, request):

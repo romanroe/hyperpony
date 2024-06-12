@@ -22,6 +22,7 @@ django = ">=4,<6"
 django-htmx = "^1.14.0"
 lxml = "^5.1.0"
 wrapt = "^1.15.0"
+watchfiles = "^0.22.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.2.2"
@@ -52,13 +53,17 @@ mkdocs-version-annotations = "^1.0.0"
 mkdocs-include-markdown-plugin = "^6.0.4"
 
 [tool.poe.tasks]
-test = "pytest"
+test = "pytest ."
 testwatch = "ptw ."
 lint = "ruff check ."
 format = "ruff format ."
 mypy = "mypy ."
 check = ["format", "test", "mypy", "lint"]
 docswatch = "mkdocs serve"
+
+[tool.poe.tasks.check_watch]
+cwd = "."
+shell = 'watchfiles "poe check" .'
 
 [tool.ruff]
 line-length = 88

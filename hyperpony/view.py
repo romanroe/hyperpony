@@ -1,15 +1,13 @@
 import functools
-from typing import Callable, cast, Optional, TypeVar
+from typing import Callable, cast, Optional
 
 import wrapt
 from django.contrib.auth import decorators as auth_decorators
 from django.http import HttpRequest, HttpResponse
 
 import hyperpony
-from hyperpony.utils import is_response_processable, response_to_str
-from hyperpony.view_stack import get_view_fn_call_stack_from_request
-
-VIEW_FN = TypeVar("VIEW_FN", bound=Callable[..., HttpResponse])
+from hyperpony.utils import is_response_processable, response_to_str, VIEW_FN
+from hyperpony.view_stack import view_stack
 
 
 class ViewResponse(wrapt.ObjectProxy):
@@ -37,8 +35,6 @@ def view(
         decorators = [auth_decorators.login_required(), *decorators]
 
     def decorator(fn: VIEW_FN) -> VIEW_FN:
-        setattr(fn, "do_not_call_in_templates", True)
-
         if inject_params:
             fn = hyperpony.inject_params()(fn)
 
@@ -49,9 +45,9 @@ def view(
         @functools.wraps(fn)
         def inner(*args, **kwargs) -> HttpResponse:
             view_request: HttpRequest = args[0]
-            stack = get_view_fn_call_stack_from_request(view_request)
+            # stack = get_view_fn_call_stack_from_request(view_request)
             try:
-                stack.append(fn)
+                # stack.append(fn)
                 response = fn(view_request, *args[1:], **kwargs)
                 response = (
                     ViewResponse(response)
@@ -60,8 +56,9 @@ def view(
                 )
                 return response
             finally:
-                stack.pop()
+                # stack.pop()
+                pass
 
-        return cast(VIEW_FN, inner)
+        return cast(VIEW_FN, view_stack()(inner))
 
     return decorator
