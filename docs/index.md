@@ -9,7 +9,7 @@ hide:
         <h1>Django library for building web applications with htmx</h1>
 </div>
 
-TODO
+Hyperpony is a Django library for building modern [hypermedia-driven web applications](https://hypermedia.systems). It provides a set of tools and patterns (e.g. decorators) for writing componentized applications using [htmx](https://htmx.org).
 
 <script async defer src="https://buttons.github.io/buttons.js"></script>
 <p align="center">
@@ -32,4 +32,3 @@ TODO
 
 !!! abstract "Installation Instructions"
     {% include-markdown ".includes/install.md" %}
-

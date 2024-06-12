@@ -21,6 +21,8 @@ INSTALLED_APPS = [
 ```
 
 ## Add the middleware to your Django project
+
+**settings.py**
 ```python
 MIDDLEWARE = [
     # ...
