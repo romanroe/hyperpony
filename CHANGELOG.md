@@ -2,6 +2,10 @@
 
 <!-- releases -->
 
+## 0.51.0 (2024-03-03)
+
+- unified view stack behaviour
+
 ## 0.50.1 (2024-02-25)
 
 - fixed Python dependency version
