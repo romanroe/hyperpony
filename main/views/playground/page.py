@@ -1,14 +1,18 @@
 from datetime import datetime
 
-from django.http import HttpRequest
 from django.shortcuts import render
 from django.urls import path, reverse
+from django_htmx.middleware import HtmxDetails
+from icecream import ic
 
 from hyperpony import param, inject_params
 
 
 @inject_params()
-def levels_page(request: HttpRequest, source=param("page")):
+def levels_page(request, source=param("page")):
+    htmx: HtmxDetails = request.htmx
+    ic(htmx.target)
+
     return render(
         request,
         "playground/page/LevelsPage.html",
