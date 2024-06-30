@@ -56,11 +56,11 @@ def inject_params() -> Callable[[VIEW_FN], VIEW_FN]:
 
 @method_decorator(view_stack(), name="dispatch")
 class InjectParams(View):
-    _params_view_parameters: ClassVar[list["InjectedParam"]]
+    __params_view_parameters: ClassVar[list["InjectedParam"]]
 
     def __new__(cls):
         ths = typing.get_type_hints(cls)
-        cls._params_view_parameters = []
+        cls.__params_view_parameters = []
         for member_name, ip in inspect.getmembers(cls):
             if isinstance(ip, QueryParam):
                 ip.name = member_name
@@ -68,12 +68,12 @@ class InjectParams(View):
                     member_name, type(ip.default) if ip.default is not None else str
                 )
                 ip.check()
-                cls._params_view_parameters.append(ip)
+                cls.__params_view_parameters.append(ip)
 
         return super().__new__(cls)
 
     def dispatch(self, request, *args, **kwargs):
-        for p in self.__class__._params_view_parameters:  # noqa: SLF001
+        for p in self.__class__.__params_view_parameters:  # noqa: SLF001
             value = p.get_value([request], kwargs)
             print(value)
             setattr(self, p.name, value)
@@ -150,7 +150,6 @@ def _setup_fn_injected_param(
 class QueryParam(InjectedParam):
     query_param_name: Optional[str] = dataclasses.field(default=None)
     default: Any = dataclasses.field(default=None)
-    # consume: bool = dataclasses.field(default=True)
     ignore_view_stack: bool = dataclasses.field(default=False)
     methods: typing.Iterable[
         typing.Literal["GET", "POST", "PUT", "DELETE", "PATCH", "__all__"]
@@ -193,16 +192,6 @@ class QueryParam(InjectedParam):
 
         return combined_qd
 
-    # def _consume_param(self, request: HttpRequest):
-    #     if self.query_param_name in request.GET:
-    #         request.GET = querydict_key_removed(
-    #             cast(Any, request.GET), self.query_param_name
-    #         )
-    #     elif self.query_param_name in request.POST:
-    #         request.POST = querydict_key_removed(
-    #             cast(Any, request.POST), self.query_param_name
-    #         )
-
     def get_value(self, args: Any, kwargs: dict[str, Any]):
         request = _get_request_from_args(args)
         lookup_dict = self._create_lookup_dict(request)
@@ -222,9 +211,6 @@ class QueryParam(InjectedParam):
                     f"No value found for request parameter '{self.query_param_name}'"
                 )
 
-        # if self.consume:
-        #     self._consume_param(request)
-
         return _convert_value_to_type(values, self.target_type)
 
 
@@ -238,14 +224,12 @@ def param(
         typing.Literal["GET", "POST", "PUT", "DELETE", "PATCH", "__all__"]
     ] = ("__all__",),
     parse_form_urlencoded_body: bool = True,
-    # consume=True,
     ignore_view_stack=False,
 ) -> T:
     return cast(
         T,
         QueryParam(
             default=default,
-            # consume=consume,
             ignore_view_stack=ignore_view_stack,
             methods=methods,
             parse_form_urlencoded_body=parse_form_urlencoded_body,

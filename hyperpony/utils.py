@@ -8,13 +8,6 @@ from django.utils.safestring import mark_safe, SafeString
 VIEW_FN = TypeVar("VIEW_FN", bound=Callable[..., HttpResponse])
 
 
-# def querydict_key_removed(querydict: dict, key) -> QueryDict:
-#     temp = QueryDict(mutable=True)
-#     temp.update(querydict)
-#     del temp[key]
-#     return temp
-
-
 def _get_request_from_args(args: list[Any]) -> HttpRequest:
     return args[0]
 
