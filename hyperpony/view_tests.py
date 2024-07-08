@@ -4,11 +4,33 @@ from django.test import RequestFactory
 from django.urls import path, resolve
 
 import hyperpony
+from hyperpony import HPView
 from hyperpony.testutils import create_resolved_request
 from hyperpony.view_stack import (
     get_view_fn_call_stack_from_request,
     is_view_stack_at_root,
 )
+
+#######################################################################
+### classed-based views
+#######################################################################
+
+
+def test_cbv_as_str(rf: RequestFactory):
+    class View1(HPView):
+        def dispatch(self, request, *args, **kwargs):
+            assert args == (1, 2, 3)
+            assert kwargs == {"a": 1, "b": 2}
+            return HttpResponse("response")
+
+    response = View1().as_str(rf.get("/"), args=(1, 2, 3), kwargs={"a": 1, "b": 2})
+    response_str = str(response)
+    assert response_str == "response"
+
+
+#######################################################################
+### function-based views
+#######################################################################
 
 
 def test_str(rf: RequestFactory):

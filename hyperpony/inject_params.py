@@ -24,7 +24,7 @@ from django.utils.decorators import method_decorator
 from django.views import View
 
 from hyperpony.utils import _get_request_from_args, VIEW_FN
-from hyperpony.view_stack import is_view_stack_at_root, view_stack
+from hyperpony.view_stack import view_stack, is_view_stack_at_root
 
 
 def inject_params() -> Callable[[VIEW_FN], VIEW_FN]:
@@ -55,14 +55,15 @@ def inject_params() -> Callable[[VIEW_FN], VIEW_FN]:
 
 
 @method_decorator(view_stack(), name="dispatch")
-class InjectParams(View):
+class InjectParamsView(View):
     __params_view_parameters: ClassVar[list["InjectedParam"]]
 
-    def __new__(cls):
+    def __new__(cls, *args, **kwargs):
         ths = typing.get_type_hints(cls)
         cls.__params_view_parameters = []
         for member_name, ip in inspect.getmembers(cls):
             if isinstance(ip, QueryParam):
+                ip.ignore_view_stack = True  # CBVs do not rely on the view stack
                 ip.name = member_name
                 ip.target_type = ths.get(
                     member_name, type(ip.default) if ip.default is not None else str
@@ -72,20 +73,23 @@ class InjectParams(View):
 
         return super().__new__(cls)
 
-    def dispatch(self, request, *args, **kwargs):
-        for p in self.__class__.__params_view_parameters:  # noqa: SLF001
-            value = p.get_value([request], kwargs)
-            print(value)
-            setattr(self, p.name, value)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        return super().dispatch(request, *args, **kwargs)
+    def setup(self, request, *args, **kwargs):
+        for p in self.__class__.__params_view_parameters:  # noqa: SLF001
+            current_value = getattr(self, p.name, None)
+            if isinstance(current_value, InjectedParam):
+                value = p.get_value([request], kwargs)
+                setattr(self, p.name, value)
+
+        return super().setup(request, *args, **kwargs)
 
 
 @dataclass
 class InjectedParam:
     name: str = dataclasses.field(init=False)
     target_type: type = dataclasses.field(init=False)
-    # view_fn: Callable[[Any], Any] = dataclasses.field(init=False)
 
     def check(self):
         pass
@@ -152,13 +156,13 @@ class QueryParam(InjectedParam):
     default: Any = dataclasses.field(default=None)
     ignore_view_stack: bool = dataclasses.field(default=False)
     methods: typing.Iterable[
-        typing.Literal["GET", "POST", "PUT", "DELETE", "PATCH", "__all__"]
+        typing.Literal["GET", "POST", "PUT", "DELETE", "PATCH", "PATH", "__all__"]
     ] = dataclasses.field(default=("GET",))
     parse_form_urlencoded_body: bool = dataclasses.field(default=False)
 
     def __post_init__(self):
         if "__all__" in self.methods:
-            self.methods = ("GET", "POST", "PUT", "DELETE", "PATCH")
+            self.methods = ("GET", "POST", "PUT", "DELETE", "PATCH", "PATH")
 
     def check(self):
         if self.query_param_name is None:
@@ -176,6 +180,11 @@ class QueryParam(InjectedParam):
             getqd = cast(QueryDict, request.GET)
             getd = {name: getqd.getlist(name) for name in getqd}
             combined_qd.update(getd)
+
+        if "PATH" in self.methods and request.resolver_match:
+            for key, value in request.resolver_match.kwargs.items():
+                if key not in combined_qd:
+                    combined_qd[key] = [value]
 
         if (
             request.method in self.methods

@@ -10,9 +10,115 @@ from django.test import RequestFactory
 from django.views import View
 from django.views.generic import TemplateView
 
-from hyperpony import inject_params, param
-from hyperpony.inject_params import InjectParams, ObjectDoesNotExistWithPk
+from hyperpony import inject_params, param, HPView
+from hyperpony.inject_params import InjectParamsView, ObjectDoesNotExistWithPk
 from main.models import AppUser
+
+#######################################################################
+### classed-based views
+#######################################################################
+
+
+def test_cbv(rf: RequestFactory):
+    class V(InjectParamsView):
+        p1: str = param()
+
+        def get(self, request):
+            assert self.p1 == "aaa"
+            return HttpResponse()
+
+    V.as_view()(rf.get("/?p1=aaa"))
+
+
+def test_cbv_template_view(rf: RequestFactory):
+    class V(InjectParamsView, TemplateView):
+        template_name = "hyperpony/tests/TemplateResponse.html"
+        p1: str = param()
+
+        def get_context_data(self, **kwargs):
+            assert self.p1 == "aaa"
+            return {"foo": "bar"}
+
+    V.as_view()(rf.get("/?p1=aaa"))
+
+
+def test_cbv_type_conversion_list_annotated(rf: RequestFactory):
+    class V(InjectParamsView, View):
+        p1: list[int] = param()
+
+        def get(self, request):
+            assert isinstance(self.p1, list)
+            assert 1 in self.p1
+            assert 2 in self.p1
+            return HttpResponse()
+
+    V.as_view()(rf.get("/?p1=1&p1=2"))
+
+
+def test_cbv_params_are_optional_when_passed_as_constructor_param(rf: RequestFactory):
+    class V(HPView):
+        p1: str = param()
+
+        def dispatch(self, request, *args, **kwargs):
+            return HttpResponse(self.p1)
+
+    response = V(p1="aaa").as_str(rf.get("/"))
+    response_str = str(response)
+    assert response_str == "aaa"
+
+
+def test_cbv_constructor_params_can_not_be_overridden_by_query_args(rf: RequestFactory):
+    class V(HPView):
+        p1: str = param()
+
+        def dispatch(self, request, *args, **kwargs):
+            return HttpResponse(self.p1)
+
+    response = V(p1="aaa").as_str(rf.get("/?p1=bbb"))
+    response_str = str(response)
+    assert response_str == "aaa"
+
+
+def test_cbv_request_is_isolated_by_default(rf: RequestFactory):
+    class V(HPView):
+        p1: str = param("parent")
+
+        def dispatch(self, request, *args, **kwargs):
+            return HttpResponse(self.p1)
+
+    response = V().as_str(rf.post("/?p1=unused"))
+    response_str = str(response)
+    assert response_str == "parent"
+
+
+def test_cbv_unisolated_request_class_setting(rf: RequestFactory):
+    class V(HPView):
+        isolate_request = False
+        p1: str = param("parent")
+
+        def dispatch(self, request, *args, **kwargs):
+            return HttpResponse(self.p1)
+
+    response = V().as_str(rf.post("/?p1=aaa"))
+    response_str = str(response)
+    assert response_str == "aaa"
+
+
+def test_cbv_unisolated_request_method_setting(rf: RequestFactory):
+    class V(HPView):
+        p1: str = param("parent")
+
+        def dispatch(self, request, *args, **kwargs):
+            return HttpResponse(self.p1)
+
+    response = V().as_str(rf.post("/?p1=aaa"), isolate_request=False)
+    response_str = str(response)
+    assert response_str == "aaa"
+
+
+#######################################################################
+### function-based views
+#######################################################################
 
 
 def test_without_type_annotation(rf: RequestFactory):
@@ -275,19 +381,6 @@ def test_param_view_stack(rf: RequestFactory):
     view1(rf.get("/?p1=a"))
 
 
-def test_param_view_stack_ignore(rf: RequestFactory):
-    @inject_params()
-    def view1(request, p1: str = param()):
-        assert p1 == "a"
-        return view2(request)
-
-    @inject_params()
-    def view2(request, p1: str = param(ignore_view_stack=True)):
-        assert p1 == "a"
-
-    view1(rf.get("/?p1=a"))
-
-
 def test_auto_default_value(rf: RequestFactory):
     @inject_params()
     def viewfn(_request, p1: str = param(default="a")):
@@ -295,39 +388,3 @@ def test_auto_default_value(rf: RequestFactory):
 
     untyped_viewfn = typing.cast(Any, viewfn)
     untyped_viewfn(rf.get("/"))
-
-
-def test_class_view(rf: RequestFactory):
-    class V(InjectParams):
-        p1: str = param()
-
-        def get(self, request):
-            assert self.p1 == "aaa"
-            return HttpResponse()
-
-    V.as_view()(rf.get("/?p1=aaa"))
-
-
-def test_class_template_view(rf: RequestFactory):
-    class V(InjectParams, TemplateView):
-        template_name = "hyperpony/tests/TemplateResponse.html"
-        p1: str = param()
-
-        def get_context_data(self, **kwargs):
-            assert self.p1 == "aaa"
-            return {"foo": "bar"}
-
-    V.as_view()(rf.get("/?p1=aaa"))
-
-
-def test_class_view_type_conversion_list_annotated(rf: RequestFactory):
-    class V(InjectParams, View):
-        p1: list[int] = param()
-
-        def get(self, request):
-            assert isinstance(self.p1, list)
-            assert 1 in self.p1
-            assert 2 in self.p1
-            return HttpResponse()
-
-    V.as_view()(rf.get("/?p1=1&p1=2"))

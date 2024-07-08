@@ -29,3 +29,9 @@ def is_response_processable(
         return False
 
     return True
+
+
+def text_response_to_str_or_none(response: HttpResponseBase) -> str | None:
+    if is_response_processable(response, "text/"):
+        return response_to_str(response)
+    return None

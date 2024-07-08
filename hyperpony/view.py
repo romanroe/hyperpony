@@ -1,22 +1,41 @@
 import functools
-from typing import Callable, cast, Optional
+from typing import Callable, cast, Optional, Any, Iterable
 
 import wrapt
+from django import views
 from django.contrib.auth import decorators as auth_decorators
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, QueryDict
+from django.utils.datastructures import MultiValueDict
 
 import hyperpony
-from hyperpony.utils import is_response_processable, response_to_str, VIEW_FN
+from hyperpony.inject_params import InjectParamsView
+from hyperpony.utils import VIEW_FN, text_response_to_str_or_none
 from hyperpony.view_stack import view_stack
+
+
+class IsolatedRequest(wrapt.ObjectProxy):
+    @property
+    def method(self):
+        return "GET"
+
+    @property
+    def GET(self):  # noqa: N802
+        return QueryDict()
+
+    @property
+    def POST(self):  # noqa: N802
+        return QueryDict()
+
+    @property
+    def FILES(self):  # noqa: N802
+        return MultiValueDict()
 
 
 class ViewResponse(wrapt.ObjectProxy):
     def __str__(self):
         response = cast(HttpResponse, self)
-        if is_response_processable(response, "text/"):
-            return response_to_str(response)
-
-        return super().__str__()
+        response_string = text_response_to_str_or_none(response)
+        return response_string if response_string is not None else super().__str__()
 
     def as_response(self) -> HttpResponse:
         return cast(HttpResponse, self)
@@ -62,3 +81,36 @@ def view(
         return cast(VIEW_FN, view_stack()(inner))
 
     return decorator
+
+
+class HPView(InjectParamsView, views.View):
+    isolate_request = True
+
+    def as_str(
+        self,
+        request: HttpRequest,
+        *,
+        isolate_request: Optional[bool] = None,
+        args: Optional[Iterable[Any]] = None,
+        kwargs: Optional[dict[str, Any]] = None,
+    ):
+        args = args or ()
+        kwargs = kwargs or {}
+        isolate_request = (
+            isolate_request if isolate_request is not None else self.isolate_request
+        )
+
+        if isolate_request:
+            request = IsolatedRequest(request)
+
+        self.setup(request, *args, **kwargs)
+        response = self.dispatch(request, *args, **kwargs)
+        response_string = text_response_to_str_or_none(response)
+        return response_string if response_string is not None else str(response)
+
+
+class ElementIdMixin:
+    element_id: Optional[str] = None
+
+    def get_element_id(self) -> str:
+        return self.element_id or self.__class__.__name__

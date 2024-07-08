@@ -23,6 +23,9 @@ django-htmx = "^1.14.0"
 lxml = "^5.1.0"
 wrapt = "^1.15.0"
 watchfiles = "^0.22.0"
+pydantic = "^2.8.2"
+orjson = "^3.10.6"
+django-ninja = "^1.2.1"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.2.2"

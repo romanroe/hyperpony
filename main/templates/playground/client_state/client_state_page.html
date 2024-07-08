@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Hyperpony - Client State
+{% endblock %}
+
+{% block body %}
+
+    <div {{ hyperpony_client_state_attrs }}
+         hx-target="#body"
+         hx-select="#body"
+         hx-swap="outerHTML"
+         x-cloak>
+
+        <h1>ClientState</h1>
+{#        <hr>#}
+{#        {{ hyperpony_client_state_attrs }}#}
+{#        <hr>#}
+
+        <div>
+            Foo <span x-text="client_state.foo"></span>
+            <button @click="client_state.foo = client_state.foo + 1">inc foo</button>
+        </div>
+
+        <div>
+            <button hx-get="{{ url }}">get</button>
+            <button hx-post="{{ url }}">post</button>
+            <button hx-put="{{ url }}">put</button>
+            <button hx-patch="{{ url }}">patch</button>
+            <button hx-delete="{{ url }}">delete</button>
+        </div>
+    
+    <div>
+        <template x-for="p in client_state.persons">
+            <div>
+                <span x-text="p.first_name"></span>
+                <span x-text="p.last_name"></span>
+            </div>
+        </template>
+    </div>
+
+    </div>
+
+{% endblock %}

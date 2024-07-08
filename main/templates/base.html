@@ -19,6 +19,10 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
     <style>
+        [x-cloak] {
+            display: none !important;
+        }
+
         input.invalid {
             border: 1px solid red;
         }
@@ -61,14 +65,50 @@
         });
 
     });
+
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('elementState', function (state_script_id) {
+            var state = JSON.parse(document.getElementById(state_script_id).innerText);
+            {#return state;#}
+            return {
+                //state_json(element_id) {
+                //    return JSON.stringify({element_id, state: this.client_state});
+                //},
+                client_state: state,
+
+            };
+        });
+    });
+    document.body.addEventListener('htmx:configRequest', function (evt) {
+        {#if (evt.detail.verb.toLowerCase() === "get") {#}
+        {#    return;#}
+        {# } #}
+        let els = document.querySelectorAll("[__hyperpony_client_state__]");
+        els.forEach(function (el) {
+            let id = el.getAttribute("__hyperpony_client_state__");
+            let data = Alpine.$data(el);
+            let client_state = data["client_state"];
+            let client_to_server_excludes = data["client_to_server_excludes"];
+
+            let filtered_client_state = {};
+            Object.keys(client_state).forEach(function (key) {
+                if (!client_to_server_excludes.includes(key)) {
+                    filtered_client_state[key] = client_state[key];
+                }
+            });
+
+            evt.detail.parameters["__hyperpony_cs__" + id] = filtered_client_state;
+        });
+    });
+
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 
-<script defer
-        type="text/javascript">
+<script defer type="text/javascript">
     document.addEventListener('alpine:init', () => {
         Alpine.directive('tom-select', (el, {expression}, {cleanup}) => {
             new TomSelect(el);

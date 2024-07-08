@@ -46,6 +46,13 @@ def hx_vals(context: RequestContext, *args, **kwargs):
     return mark_safe(attr)
 
 
+@register.simple_tag(takes_context=True)
+def x_data(context: RequestContext, *args, **kwargs):
+    j = _args_kwargs_to_json_dict(context, args, kwargs)
+    attr = f" x-data='{j}' "
+    return mark_safe(attr)
+
+
 @register.filter
 def model_to_dict(model):
     return forms.model_to_dict(model)

@@ -1,0 +1,47 @@
+{% load widget_tweaks %}
+{% load hyperpony %}
+
+<div>
+    {{ request.path_info }}
+</div>
+
+{% if person %}
+
+    <div class="p-3">
+
+        <form hx-post="{{ request.path_info }}">
+
+            {% with form.first_name as field %}
+                <div class="row mb-3">
+                    <div class="col-3">{{ field.label }}</div>
+                    <div class="col">
+                        {{ field|add_class:"form-control" }}
+                        <div>{{ field.errors }}</div>
+                    </div>
+                </div>
+            {% endwith %}
+
+            {% with form.last_name as field %}
+                <div class="row mb-3">
+                    <div class="col-3">{{ field.label }}</div>
+                    <div class="col">
+                        {{ field|add_class:"form-control" }}
+                        <div>{{ field.errors }}</div>
+                    </div>
+                </div>
+            {% endwith %}
+
+            <div>
+                <button class="btn btn-primary" type="submit">
+                    Save
+                </button>
+                <button class="btn btn-secondary" type="reset">
+                    Reset
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+{% endif %}

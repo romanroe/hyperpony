@@ -3,12 +3,11 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, cast, Optional
 
 from django.http import HttpRequest, HttpResponse, HttpResponseBase
-from django.views import View
 from django_htmx.http import reswap as htmx_reswap
 from django_htmx.http import retarget as htmx_retarget
 
 from hyperpony.utils import is_response_processable, response_to_str
-from hyperpony.view import view, VIEW_FN, ViewResponse
+from hyperpony.view import view, VIEW_FN, ViewResponse, HPView, ElementIdMixin
 
 
 # def split_content_and_swap_oob(content: str) -> Tuple[str, str]:
@@ -130,8 +129,9 @@ def element(
     return decorator
 
 
-class ElementView(View):
-    element_id: Optional[str] = None
+class ElementView(ElementIdMixin, HPView):
+    __client_state_schema: type
+
     tag: str = "div"
     hx_target: str = "this"
     hx_swap: str = "outerHTML"
@@ -143,7 +143,7 @@ class ElementView(View):
         return ElementResponse.wrap(
             response,
             ElementMeta(
-                element_id=self.element_id or self.__class__.__name__,
+                element_id=self.get_element_id(),
                 tag=self.tag,
                 hx_target=self.hx_target,
                 hx_swap=self.hx_swap,

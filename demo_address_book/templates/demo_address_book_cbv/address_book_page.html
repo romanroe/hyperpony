@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block body %}
+    <div class="d-flex flex-column h-100">
+
+        <div class="bg-success p-3 text-white">
+            <h3>Address Book</h3>
+        </div>
+
+        <div class="flex-grow-1 h-100 overflow-hidden">
+
+            <div class="d-flex h-100">
+
+                <div class="h-100 overflow-y-scroll border-end"
+                     style="width: 25vw; min-width: 20rem; max-width: 500px;">
+                    {{ list_element }}
+                </div>
+
+                <div id="detail-element-wrapper" class="w-100">
+                    {{ detail_element }}
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+{% endblock %}
