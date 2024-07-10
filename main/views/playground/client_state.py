@@ -15,10 +15,10 @@ class PersonClientState(ModelSchema):
 class ClientStatePage(TemplateView, ClientStateView):
     template_name = "playground/client_state/client_state_page.html"
     foo: int = client_state(1, client_to_server=True)
-    persons: list[Person] = client_state([], model=list[PersonClientState])
+    # persons: list[Person] = client_state([], model=list[PersonClientState])
 
     def get_context_data(self, **kwargs):
-        self.persons = Person.objects.all()[:10]
+        # self.persons = Person.objects.all()[:10]
         print(self.is_client_state_present, self.foo)
 
         return super().get_context_data(**kwargs) | {
