@@ -9,7 +9,6 @@ from typing import (
     Any,
     Callable,
     cast,
-    ClassVar,
     get_args,
     get_origin,
     Optional,
@@ -54,34 +53,45 @@ def inject_params() -> Callable[[VIEW_FN], VIEW_FN]:
     return decorator
 
 
-@method_decorator(view_stack(), name="dispatch")
-class InjectParamsView(View):
-    __params_view_parameters: ClassVar[list["InjectedParam"]]
+class InjectParamsViewBase(type):
+    def __new__(cls, name, bases, attrs):
+        parents = [b for b in bases if isinstance(b, InjectParamsViewBase)]
+        if not parents:
+            return super().__new__(cls, name, bases, attrs)
 
-    def __new__(cls, *args, **kwargs):
-        ths = typing.get_type_hints(cls)
-        cls.__params_view_parameters = []
-        for member_name, ip in inspect.getmembers(cls):
-            if isinstance(ip, QueryParam):
-                ip.ignore_view_stack = True  # CBVs do not rely on the view stack
-                ip.name = member_name
-                ip.target_type = ths.get(
-                    member_name, type(ip.default) if ip.default is not None else str
+        params: dict[str, QueryParam] = {}
+        type_hints = attrs["__annotations__"] if "__annotations__" in attrs else {}
+        for member_name, qp in attrs.items():
+            if isinstance(qp, QueryParam):
+                qp.ignore_view_stack = True  # CBVs do not rely on the view stack
+                qp.name = member_name
+                qp.target_type = type_hints.get(
+                    member_name, type(qp.default) if qp.default is not None else str
                 )
-                ip.check()
-                cls.__params_view_parameters.append(ip)
+                qp.check()
+                params[member_name] = qp
+                attrs[member_name] = qp.default
 
-        return super().__new__(cls)
+        view_class: Any = super().__new__(cls, name, bases, attrs)
+        setattr(view_class, "_hyperpony_params", params)
+        return view_class
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+
+@method_decorator(view_stack(), name="dispatch")
+class InjectParamsView(View, metaclass=InjectParamsViewBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for k, v in kwargs.items():
+            if (qp := self.hyperpony_params().get(k, None)) and qp.default == _REQUIRED:
+                qp.default = v
+
+    def hyperpony_params(self) -> dict[str, "QueryParam"]:
+        return getattr(self, "_hyperpony_params")
 
     def setup(self, request, *args, **kwargs):
-        for p in self.__class__.__params_view_parameters:  # noqa: SLF001
-            current_value = getattr(self, p.name, None)
-            if isinstance(current_value, InjectedParam):
-                value = p.get_value([request], kwargs)
-                setattr(self, p.name, value)
+        for attrvalue in self.hyperpony_params().values():
+            value = attrvalue.get_value([request], kwargs)
+            setattr(self, attrvalue.name, value)
 
         return super().setup(request, *args, **kwargs)
 
@@ -168,7 +178,7 @@ class QueryParam(InjectedParam):
         if self.query_param_name is None:
             self.query_param_name = self.name
 
-    def _create_lookup_dict(self, request: HttpRequest):
+    def _create_lookup_dict(self, request: HttpRequest, **kwargs):
         combined_qd = QueryDict(mutable=True)
 
         if "POST" in self.methods:
@@ -199,11 +209,14 @@ class QueryParam(InjectedParam):
                 if name not in combined_qd:
                     combined_qd[name] = formqd.getlist(name)
 
+        for k, v in kwargs.items():
+            combined_qd[k] = [v]
+
         return combined_qd
 
     def get_value(self, args: Any, kwargs: dict[str, Any]):
         request = _get_request_from_args(args)
-        lookup_dict = self._create_lookup_dict(request)
+        lookup_dict = self._create_lookup_dict(request, **kwargs)
 
         if self.ignore_view_stack or is_view_stack_at_root(request):
             values = lookup_dict.get(self.query_param_name, None)
@@ -211,7 +224,7 @@ class QueryParam(InjectedParam):
             values = None
 
         if values is None:
-            if self.default is not None:
+            if self.default is not _REQUIRED:
                 values = [self.default]
             elif issubclass(NoneType, self.target_type):
                 return None
@@ -225,9 +238,11 @@ class QueryParam(InjectedParam):
 
 T = TypeVar("T")
 
+_REQUIRED = object()
+
 
 def param(
-    default: T = cast(Any, None),
+    default: T = cast(Any, _REQUIRED),
     *,
     methods: typing.Iterable[
         typing.Literal["GET", "POST", "PUT", "DELETE", "PATCH", "__all__"]

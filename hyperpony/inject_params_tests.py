@@ -10,7 +10,7 @@ from django.test import RequestFactory
 from django.views import View
 from django.views.generic import TemplateView
 
-from hyperpony import inject_params, param, HPView
+from hyperpony import inject_params, param, NestedView
 from hyperpony.inject_params import InjectParamsView, ObjectDoesNotExistWithPk
 from main.models import AppUser
 
@@ -56,7 +56,7 @@ def test_cbv_type_conversion_list_annotated(rf: RequestFactory):
 
 
 def test_cbv_params_are_optional_when_passed_as_constructor_param(rf: RequestFactory):
-    class V(HPView):
+    class V(NestedView):
         p1: str = param()
 
         def dispatch(self, request, *args, **kwargs):
@@ -68,7 +68,7 @@ def test_cbv_params_are_optional_when_passed_as_constructor_param(rf: RequestFac
 
 
 def test_cbv_constructor_params_can_not_be_overridden_by_query_args(rf: RequestFactory):
-    class V(HPView):
+    class V(NestedView):
         p1: str = param()
 
         def dispatch(self, request, *args, **kwargs):
@@ -79,20 +79,45 @@ def test_cbv_constructor_params_can_not_be_overridden_by_query_args(rf: RequestF
     assert response_str == "aaa"
 
 
-def test_cbv_request_is_isolated_by_default(rf: RequestFactory):
-    class V(HPView):
-        p1: str = param("parent")
+def test_cbv_params_can_be_passed_with_as_str_method(rf: RequestFactory):
+    class V(InjectParamsView, NestedView):
+        p1: str = param()
 
         def dispatch(self, request, *args, **kwargs):
             return HttpResponse(self.p1)
 
-    response = V().as_str(rf.post("/?p1=unused"))
+    response = V().as_str(rf.get("/?p1=bbb"), p1="aaa")
     response_str = str(response)
-    assert response_str == "parent"
+    assert response_str == "aaa"
+
+
+def test_cbv_request_is_isolated_by_default(rf: RequestFactory):
+    class V(InjectParamsView, NestedView):
+        p1: str = param("aaa")
+
+        def dispatch(self, request, *args, **kwargs):
+            return HttpResponse(self.p1)
+
+    response = V().as_str(rf.post("/?p1=bbb"))
+    response_str = str(response)
+    assert response_str == "aaa"
 
 
 def test_cbv_unisolated_request_class_setting(rf: RequestFactory):
-    class V(HPView):
+    class V(InjectParamsView, NestedView):
+        isolate_request = False
+        p1: str = param("aaa")
+
+        def dispatch(self, request, *args, **kwargs):
+            return HttpResponse(self.p1)
+
+    response = V().as_str(rf.post("/?p1=bbb"))
+    response_str = str(response)
+    assert response_str == "bbb"
+
+
+def test_cbv_unisolated_request_method_setting(rf: RequestFactory):
+    class V(InjectParamsView, NestedView):
         isolate_request = False
         p1: str = param("parent")
 
@@ -104,16 +129,13 @@ def test_cbv_unisolated_request_class_setting(rf: RequestFactory):
     assert response_str == "aaa"
 
 
-def test_cbv_unisolated_request_method_setting(rf: RequestFactory):
-    class V(HPView):
-        p1: str = param("parent")
+def test_cbv_default_values_are_set_in_class(rf: RequestFactory):
+    class V(InjectParamsView, NestedView):
+        p1: str = param("aaa")
+        p2: int = param(123)
 
-        def dispatch(self, request, *args, **kwargs):
-            return HttpResponse(self.p1)
-
-    response = V().as_str(rf.post("/?p1=aaa"), isolate_request=False)
-    response_str = str(response)
-    assert response_str == "aaa"
+    assert V.p1 == "aaa"
+    assert V.p2 == 123
 
 
 #######################################################################

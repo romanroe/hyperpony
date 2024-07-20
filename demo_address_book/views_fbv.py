@@ -16,7 +16,7 @@ from hyperpony.form import create_form, is_valid_submit
 def address_book_page(request: HttpRequest, person_id: UUID | None = param()):
     return render(
         request,
-        "demo_address_book/address_book_page.html",
+        "demo_address_book_fbv/address_book_page.html",
         {
             "list_element": list_element(request, person_id=person_id),
             "detail_element": detail_element(
@@ -46,7 +46,7 @@ def list_element(
 
     return render(
         request,
-        "demo_address_book/list_element.html",
+        "demo_address_book_fbv/list_element.html",
         {
             "url": reverse("address-book-list-element"),
             "view": list_element,
@@ -93,7 +93,7 @@ def detail_element(request: HttpRequest, person_id: str):
 
     return render(
         request,
-        "demo_address_book/detail_element.html",
+        "demo_address_book_fbv/detail_element.html",
         {
             "url": reverse(
                 "address-book-detail-element", kwargs={"person_id": person_id}

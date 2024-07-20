@@ -1,5 +1,5 @@
 import functools
-from typing import Callable, cast, Optional, Any, Iterable
+from typing import Callable, cast, Optional
 
 import wrapt
 from django import views
@@ -8,12 +8,20 @@ from django.http import HttpRequest, HttpResponse, QueryDict
 from django.utils.datastructures import MultiValueDict
 
 import hyperpony
-from hyperpony.inject_params import InjectParamsView
 from hyperpony.utils import VIEW_FN, text_response_to_str_or_none
 from hyperpony.view_stack import view_stack
 
 
 class IsolatedRequest(wrapt.ObjectProxy):
+    @classmethod
+    def wrap(
+        cls,
+        request: HttpRequest,
+        get_querydict: Optional[QueryDict] = None,
+        post_querydict: Optional[QueryDict] = None,
+    ):
+        return IsolatedRequest(request)
+
     @property
     def method(self):
         return "GET"
@@ -83,25 +91,17 @@ def view(
     return decorator
 
 
-class HPView(InjectParamsView, views.View):
+class NestedView(views.View):
     isolate_request = True
 
     def as_str(
         self,
         request: HttpRequest,
-        *,
-        isolate_request: Optional[bool] = None,
-        args: Optional[Iterable[Any]] = None,
-        kwargs: Optional[dict[str, Any]] = None,
+        *args,
+        **kwargs,
     ):
-        args = args or ()
-        kwargs = kwargs or {}
-        isolate_request = (
-            isolate_request if isolate_request is not None else self.isolate_request
-        )
-
-        if isolate_request:
-            request = IsolatedRequest(request)
+        if self.isolate_request:
+            request = IsolatedRequest.wrap(request)
 
         self.setup(request, *args, **kwargs)
         response = self.dispatch(request, *args, **kwargs)

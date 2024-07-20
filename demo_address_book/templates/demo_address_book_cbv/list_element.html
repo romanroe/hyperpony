@@ -1,6 +1,6 @@
 {% load hyperpony %}
 
-<div>
+<div class="h-100 overflow-hidden">
 
     <div class="m-2">
         <input class="form-control"
@@ -14,14 +14,13 @@
         />
     </div>
 
-    <div id="person-list" class="list-group list-group-flush" >
+    <div id="person-list" class="overflow-y-scroll list-group list-group-flush" >
 
         {% for person in persons %}
             <div>
-                <a href="#"
-                   class="list-group-item list-group-item-action {% if person.id == person_id %}active{% endif %}"
-                   _="on click take .active from #person-list > .list-group-item"
-                   hx-get="{% url "address-book-page-cbv" person.id %}"
+                <a href="{% url "address-book-page-cbv" person.id %}"
+                   class="list-group-item list-group-item-action {% if person.id == selected_person.id %}active{% endif %}"
+                   hx-boost="true"
                    hx-target="#detail-element-wrapper"
                    hx-select="#detail-element-wrapper"
                    hx-swap="innerHTML"

@@ -4,7 +4,7 @@ from django.test import RequestFactory
 from django.urls import path, resolve
 
 import hyperpony
-from hyperpony import HPView
+from hyperpony import NestedView
 from hyperpony.testutils import create_resolved_request
 from hyperpony.view_stack import (
     get_view_fn_call_stack_from_request,
@@ -17,13 +17,13 @@ from hyperpony.view_stack import (
 
 
 def test_cbv_as_str(rf: RequestFactory):
-    class View1(HPView):
+    class View1(NestedView):
         def dispatch(self, request, *args, **kwargs):
             assert args == (1, 2, 3)
             assert kwargs == {"a": 1, "b": 2}
             return HttpResponse("response")
 
-    response = View1().as_str(rf.get("/"), args=(1, 2, 3), kwargs={"a": 1, "b": 2})
+    response = View1().as_str(rf.get("/"), 1, 2, 3, a=1, b=2)
     response_str = str(response)
     assert response_str == "response"
 

@@ -11,7 +11,6 @@ class V(ClientStateView):
     foo: str = client_state("foo", client_to_server=True)
     bar: int = client_state(123, client_to_server=True)
     baz: str = client_state("baz")
-    foi: str = client_state(default_factory=lambda: "foi")
 
     def get(self, request):
         response = HttpResponse(
@@ -29,14 +28,10 @@ class V(ClientStateView):
         return self.get(request)
 
 
-def test_client_state_default_values(rf: RequestFactory):
+def test_client_state_default_values_are_set_in_class(rf: RequestFactory):
     assert V.foo == "foo"
     assert V.bar == 123
     assert V.baz == "baz"
-    assert V.foi is None
-    req = rf.get("/")
-    instance = V.as_view()(req).view
-    assert instance.foi == "foi"
 
 
 def test_server_to_client(rf: RequestFactory):

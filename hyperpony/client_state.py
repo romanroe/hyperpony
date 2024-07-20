@@ -1,6 +1,6 @@
 import dataclasses
 from dataclasses import dataclass
-from typing import Any, cast, Optional, Tuple, Callable
+from typing import Any, cast, Optional, Tuple
 from typing import TypeVar
 
 import orjson
@@ -16,7 +16,6 @@ from hyperpony.view import ElementIdMixin
 @dataclass()
 class ClientState:
     default: Any = dataclasses.field(default=None)
-    default_factory: Optional[Any] = dataclasses.field(default=None)
     client_to_server: bool = dataclasses.field(default=True)
     schema: Optional[Any] = dataclasses.field(default=None)
 
@@ -27,7 +26,6 @@ T = TypeVar("T")
 def client_state(
     default: Optional[T] = None,
     *,
-    default_factory: Optional[Callable[[], T]] = None,
     client_to_server=False,
     schema: Optional[Any] = None,
 ) -> T:
@@ -35,7 +33,6 @@ def client_state(
         T,
         ClientState(
             default=default,
-            default_factory=default_factory,
             client_to_server=client_to_server,
             schema=schema,
         ),
@@ -99,23 +96,11 @@ class ClientStateView(
 ):
     is_client_state_present = False
 
-    def get__hyperpony_client_state_config(self) -> ClientStateViewConfig:
+    def hyperpony_client_state_config(self) -> ClientStateViewConfig:
         return getattr(self, "_hyperpony_client_state_config")
-
-    # def __new__(cls, *args, **kwargs):
-    #     instance = super().__new__(cls)
-    #     config = instance.get__hyperpony_client_state_config()
-    #     for k, v in config.client_state_fields.items():
-    #         setattr(instance, k, v.default)
-    #     return instance
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-
-        config = self.get__hyperpony_client_state_config()
-        for k, v in config.client_state_fields.items():
-            if v.default_factory is not None:
-                setattr(self, k, v.default_factory())
 
         if getattr(request, "htmx", False) and not hasattr(
             request, "_hyperpony_client_state"
@@ -126,7 +111,7 @@ class ClientStateView(
             client_state_element = client_state.get(self.get_element_id(), None)
             if client_state_element is not None:
                 self.is_client_state_present = True
-                config = self.get__hyperpony_client_state_config()
+                config = self.hyperpony_client_state_config()
                 model = config.schema_in.model_validate_json(client_state_element)
                 data = model.model_dump()
                 for k, v in data.items():
@@ -138,7 +123,7 @@ class ClientStateView(
         }
 
     def get_client_state_attrs(self):
-        meta = self.get__hyperpony_client_state_config()
+        meta = self.hyperpony_client_state_config()
         data = {}
         for k in meta.schema_out.model_fields.keys():
             data[k] = getattr(self, k)

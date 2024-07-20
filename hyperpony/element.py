@@ -7,7 +7,7 @@ from django_htmx.http import reswap as htmx_reswap
 from django_htmx.http import retarget as htmx_retarget
 
 from hyperpony.utils import is_response_processable, response_to_str
-from hyperpony.view import view, VIEW_FN, ViewResponse, HPView, ElementIdMixin
+from hyperpony.view import view, VIEW_FN, ViewResponse, NestedView, ElementIdMixin
 
 
 # def split_content_and_swap_oob(content: str) -> Tuple[str, str]:
@@ -129,7 +129,7 @@ def element(
     return decorator
 
 
-class ElementView(ElementIdMixin, HPView):
+class ElementView(ElementIdMixin, NestedView):
     __client_state_schema: type
 
     tag: str = "div"
