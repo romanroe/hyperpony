@@ -1,21 +1,23 @@
 {% extends "base.html" %}
 
+{% load hyperpony %}
+
 {% block title %}
     Hyperpony - Client State
 {% endblock %}
 
 {% block body %}
 
-    <div {{ hyperpony_client_state_attrs }}
+    <div {{ client_state_attrs }}
          hx-target="#body"
          hx-select="#body"
          hx-swap="outerHTML"
          x-cloak>
 
         <h1>ClientState</h1>
-{#        <hr>#}
-{#        {{ hyperpony_client_state_attrs }}#}
-{#        <hr>#}
+        <hr>
+        {{ client_state_attrs }}
+        <hr>
 
         <div>
             Foo <span x-text="client_state.foo"></span>

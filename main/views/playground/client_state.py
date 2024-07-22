@@ -12,7 +12,7 @@ class PersonClientState(ModelSchema):
         fields = "__all__"
 
 
-class ClientStatePage(TemplateView, ClientStateView):
+class ClientStatePage(ClientStateView, TemplateView):
     template_name = "playground/client_state/client_state_page.html"
     foo: int = client_state(1, client_to_server=True)
     # persons: list[Person] = client_state([], model=list[PersonClientState])

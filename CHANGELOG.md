@@ -2,6 +2,10 @@
 
 <!-- releases -->
 
+## 0.60.1 (2024-07-21)
+
+- BETA: client state support (via Alpine.js)
+
 ## 0.51.0 (2024-03-03)
 
 - unified view stack behaviour

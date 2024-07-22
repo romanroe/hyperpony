@@ -4,7 +4,7 @@ from typing import Any, cast, Optional, Tuple
 from typing import TypeVar
 
 import orjson
-from django.http import HttpRequest
+from django.http import HttpRequest, QueryDict
 from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.generic.base import ContextMixin
@@ -108,8 +108,7 @@ class ClientStateView(
             setattr(request, "_hyperpony_client_state", _extract_client_states(request))
 
         if client_state := getattr(request, "_hyperpony_client_state", None):
-            client_state_element = client_state.get(self.get_element_id(), None)
-            if client_state_element is not None:
+            if client_state_element := client_state.get(self.get_element_id(), None):
                 self.is_client_state_present = True
                 config = self.hyperpony_client_state_config()
                 model = config.schema_in.model_validate_json(client_state_element)
@@ -118,9 +117,8 @@ class ClientStateView(
                     setattr(self, k, v)
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(**kwargs) | {
-            "hyperpony_client_state_attrs": self.get_client_state_attrs(),
-        }
+        kwargs.setdefault("client_state_attrs", self.get_client_state_attrs())
+        return super().get_context_data(**kwargs)
 
     def get_client_state_attrs(self):
         meta = self.hyperpony_client_state_config()
@@ -139,7 +137,7 @@ class ClientStateView(
             + client_to_server_excludes_json.decode("utf-8")
             + "}' "
         )
-        attrs = f" __hyperpony_client_state__ = '{self.get_element_id()}' f{x_data} "
+        attrs = f" __hyperpony_client_state__ = '{self.get_element_id()}' {x_data} "
         return mark_safe(attrs)
 
 
@@ -148,6 +146,13 @@ def _extract_client_states(request: HttpRequest) -> dict[str, Any]:
         **request.POST,
         **request.GET,
     }
+
+    if (
+        request.method not in ("GET", "POST")
+        and request.content_type == "application/x-www-form-urlencoded"
+    ):
+        qd.update(QueryDict(request.body, encoding=request.encoding))
+
     client_states = {}
     for key, value in qd.items():
         if key.startswith("__hyperpony_cs__"):
