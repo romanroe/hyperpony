@@ -1,20 +1,19 @@
 from django.urls import path, reverse
 from django.views.generic import TemplateView
-from ninja import ModelSchema
 
-from demo_address_book.models import Person
 from hyperpony.client_state import ClientStateView, client_state
 
 
-class PersonClientState(ModelSchema):
-    class Meta:
-        model = Person
-        fields = "__all__"
+# class PersonClientState(ModelSchema):
+#     class Meta:
+#         model = Person
+#         fields = "__all__"
 
 
 class ClientStatePage(ClientStateView, TemplateView):
     template_name = "playground/client_state/client_state_page.html"
     foo: int = client_state(1, client_to_server=True)
+
     # persons: list[Person] = client_state([], model=list[PersonClientState])
 
     def get_context_data(self, **kwargs):

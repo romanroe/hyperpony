@@ -2,6 +2,10 @@
 
 <!-- releases -->
 
+## 0.60.2 (2024-08-14)
+
+- fixed Optional params with default value of None
+
 ## 0.60.1 (2024-07-21)
 
 - BETA: client state support (via Alpine.js)

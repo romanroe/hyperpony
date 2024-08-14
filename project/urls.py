@@ -4,6 +4,7 @@ from django.urls import include, path
 # global URLs
 urlpatterns = [
     # Demos
+    path("playground/params/", include("main.views.playground.params")),
     path("playground/elements/", include("main.views.playground.elements")),
     path("playground/page/", include("main.views.playground.page")),
     path("playground/client_state/", include("main.views.playground.client_state")),

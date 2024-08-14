@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% load hyperpony %}
+
+{% block title %}
+    Hyperpony - Params
+{% endblock %}
+
+{% block body %}
+
+    <div hx-target="#body"
+         hx-select="#body"
+         hx-swap="outerHTML">
+
+        <h1>Params</h1>
+        
+        <div>
+            Value: {{ value }}
+        </div>
+
+        <div>
+            <button {% hx_vals value="get" %} hx-get="{{ url }}">get</button>
+            <button {% hx_vals value="post" %} hx-post="{{ url }}">post</button>
+            <button {% hx_vals value="put" %} hx-put="{{ url }}">put</button>
+            <button {% hx_vals value="patch" %} hx-patch="{{ url }}">patch</button>
+            <button {% hx_vals value="delete" %} hx-delete="{{ url }}">delete</button>
+        </div>
+
+    </div>
+
+{% endblock %}

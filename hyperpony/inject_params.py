@@ -4,7 +4,7 @@ import inspect
 import typing
 import uuid
 from dataclasses import dataclass
-from types import NoneType, UnionType
+from types import UnionType
 from typing import (
     Any,
     Callable,
@@ -22,7 +22,7 @@ from django.http import HttpRequest, HttpResponse, QueryDict
 from django.utils.decorators import method_decorator
 from django.views import View
 
-from hyperpony.utils import _get_request_from_args, VIEW_FN
+from hyperpony.utils import _get_request_from_args, VIEW_FN, is_none_compatible
 from hyperpony.view_stack import view_stack, is_view_stack_at_root
 
 
@@ -168,7 +168,7 @@ class QueryParam(InjectedParam):
     methods: typing.Iterable[
         typing.Literal["GET", "POST", "PUT", "DELETE", "PATCH", "PATH", "__all__"]
     ] = dataclasses.field(default=("GET",))
-    parse_form_urlencoded_body: bool = dataclasses.field(default=False)
+    # parse_form_urlencoded_body: bool = dataclasses.field(default=True)
 
     def __post_init__(self):
         if "__all__" in self.methods:
@@ -179,40 +179,54 @@ class QueryParam(InjectedParam):
             self.query_param_name = self.name
 
     def _create_lookup_dict(self, request: HttpRequest, **kwargs):
-        combined_qd = QueryDict(mutable=True)
+        source = QueryDict(mutable=True)
+        getqd = cast(QueryDict, request.GET)
+        postqd = cast(QueryDict, request.POST)
 
-        if "POST" in self.methods:
-            postqd = cast(QueryDict, request.POST)
-            postd = {name: postqd.getlist(name) for name in postqd}
-            combined_qd.update(postd)
+        if request.method in self.methods:
+            # Order matters! GET overrides POST
+            source.update({name: postqd.getlist(name) for name in postqd})
+            source.update({name: getqd.getlist(name) for name in getqd})
 
-        if "GET" in self.methods:
-            getqd = cast(QueryDict, request.GET)
-            getd = {name: getqd.getlist(name) for name in getqd}
-            combined_qd.update(getd)
+            if (
+                # self.parse_form_urlencoded_body and
+                request.content_type == "application/x-www-form-urlencoded"
+            ):
+                patchqd = QueryDict(request.body, encoding=request.encoding)
+                source.update({name: patchqd.getlist(name) for name in patchqd})
 
-        if "PATH" in self.methods and request.resolver_match:
-            for key, value in request.resolver_match.kwargs.items():
-                if key not in combined_qd:
-                    combined_qd[key] = [value]
-
-        if (
-            request.method in self.methods
-            and self.parse_form_urlencoded_body
-            and request.content_type == "application/x-www-form-urlencoded"
-        ):
-            formqd = QueryDict(mutable=True)
-            formqd.update(
-                QueryDict(request.body, mutable=True, encoding=request.encoding)
-            )
-            for name in formqd.keys():
-                if name not in combined_qd:
-                    combined_qd[name] = formqd.getlist(name)
+        # if "POST" in self.methods:
+        #     postqd = cast(QueryDict, request.POST)
+        #     postd = {name: postqd.getlist(name) for name in postqd}
+        #     source.update(postd)
+        #
+        # if "GET" in self.methods:
+        #     getqd = cast(QueryDict, request.GET)
+        #     getd = {name: getqd.getlist(name) for name in getqd}
+        #     source.update(getd)
+        #
+        # if "PATH" in self.methods and request.resolver_match:
+        #     for key, value in request.resolver_match.kwargs.items():
+        #         if key not in source:
+        #             source[key] = [value]
+        #
+        # if (
+        #     request.method in self.methods
+        #     and self.parse_form_urlencoded_body
+        #     and request.content_type == "application/x-www-form-urlencoded"
+        # ):
+        #     formqd = QueryDict(mutable=True)
+        #     formqd.update(
+        #         QueryDict(request.body, mutable=True, encoding=request.encoding)
+        #     )
+        #     for name in formqd.keys():
+        #         if name not in source:
+        #             source[name] = formqd.getlist(name)
 
         for k, v in kwargs.items():
-            combined_qd[k] = [v]
+            source[k] = [v]
 
-        return combined_qd
+        return source
 
     def get_value(self, args: Any, kwargs: dict[str, Any]):
         request = _get_request_from_args(args)
@@ -224,13 +238,13 @@ class QueryParam(InjectedParam):
             values = None
 
         if values is None:
+            if is_none_compatible(self.target_type):
+                return None
             if self.default is not _REQUIRED:
                 values = [self.default]
-            elif issubclass(NoneType, self.target_type):
-                return None
             else:
                 raise Exception(
-                    f"No value found for request parameter '{self.query_param_name}'"
+                    f"No value found for non-optional request parameter '{self.query_param_name}'"
                 )
 
         return _convert_value_to_type(values, self.target_type)
@@ -247,7 +261,7 @@ def param(
     methods: typing.Iterable[
         typing.Literal["GET", "POST", "PUT", "DELETE", "PATCH", "__all__"]
     ] = ("__all__",),
-    parse_form_urlencoded_body: bool = True,
+    # parse_form_urlencoded_body: bool = True,
     ignore_view_stack=False,
 ) -> T:
     return cast(
@@ -256,7 +270,7 @@ def param(
             default=default,
             ignore_view_stack=ignore_view_stack,
             methods=methods,
-            parse_form_urlencoded_body=parse_form_urlencoded_body,
+            # parse_form_urlencoded_body=parse_form_urlencoded_body,
         ),
     )
 

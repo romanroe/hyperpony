@@ -1,4 +1,5 @@
-from typing import Any, TypeVar, Callable
+from types import UnionType
+from typing import Any, TypeVar, Callable, get_origin, Union, get_args, Optional
 
 from django.http import HttpRequest, HttpResponse, HttpResponseBase
 from django.template.response import TemplateResponse
@@ -35,3 +36,27 @@ def text_response_to_str_or_none(response: HttpResponseBase) -> str | None:
     if is_response_processable(response, "text/"):
         return response_to_str(response)
     return None
+
+
+def is_none_compatible(type_hint):
+    # Get the origin of the type hint (e.g., Union, Optional, etc.)
+    origin = get_origin(type_hint)
+
+    # Handle Union and Optional (Optional[X] is Union[X, None])
+    if origin is Union:
+        args = get_args(type_hint)
+        return type(None) in args
+
+    # Handle direct usage of NoneType
+    if type_hint is type(None):
+        return True
+
+    # Handle the union operator (|) in Python 3.10+
+    if isinstance(type_hint, UnionType):
+        return type(None) in get_args(type_hint)
+
+    # Handle direct usage of Optional (which is Optional[X] == Union[X, None])
+    if type_hint is Optional:
+        return True
+
+    return False

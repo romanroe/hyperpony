@@ -192,6 +192,14 @@ def test_optional_as_union(rf: RequestFactory):
     viewfn(rf.get("/"))
 
 
+def test_optional_as_union_with_default_none(rf: RequestFactory):
+    @inject_params()
+    def viewfn(_request, p1: str | None = param(None)):
+        assert p1 is None
+
+    viewfn(rf.get("/"))
+
+
 def test_optional_with_type_conversion(rf: RequestFactory):
     @inject_params()
     def viewfn(_request, p1: Optional[int] = param()):
@@ -351,8 +359,8 @@ def test_patch(rf: RequestFactory):
     @inject_params()
     def viewfn(
         _request,
-        p1: str = param(methods=["PATCH"], parse_form_urlencoded_body=True),
-        p2: str = param(methods=["PATCH"], parse_form_urlencoded_body=True),
+        p1: str = param(methods=["PATCH"]),
+        p2: str = param(methods=["PATCH"]),
     ):
         assert p1 == "aaa"
         assert p2 == "bbb"
