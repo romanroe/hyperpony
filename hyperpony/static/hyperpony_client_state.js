@@ -1,4 +1,8 @@
 document.body.addEventListener('htmx:configRequest', function (evt) {
+    if (evt.detail.verb === "get") {
+        return;
+    }
+
     let els = document.querySelectorAll("[__hyperpony_client_state__]");
     els.forEach(function (el) {
         let id = el.getAttribute("__hyperpony_client_state__");

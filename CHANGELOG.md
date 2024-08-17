@@ -2,6 +2,10 @@
 
 <!-- releases -->
 
+## 0.60.4 (2024-08-17)
+
+- fixed: do not create client_state on GET requests
+
 ## 0.60.3 (2024-08-17)
 
 - support for HTMX 2.0
