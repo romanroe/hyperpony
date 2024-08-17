@@ -13,7 +13,6 @@ from hyperpony.client_state import ClientStateView, client_state
 class ClientStatePage(ClientStateView, TemplateView):
     template_name = "playground/client_state/client_state_page.html"
     foo: int = client_state(1, client_to_server=True)
-
     # persons: list[Person] = client_state([], model=list[PersonClientState])
 
     def get_context_data(self, **kwargs):

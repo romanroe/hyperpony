@@ -16,3 +16,4 @@ document.body.addEventListener('htmx:configRequest', function (evt) {
         evt.detail.parameters["__hyperpony_cs__" + id] = filtered_client_state;
     });
 });
+

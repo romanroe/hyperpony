@@ -2,6 +2,10 @@
 
 <!-- releases -->
 
+## 0.60.3 (2024-08-17)
+
+- support for HTMX 2.0
+
 ## 0.60.2 (2024-08-14)
 
 - fixed Optional params with default value of None

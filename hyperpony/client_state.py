@@ -144,11 +144,15 @@ class ClientStateView(
 def _extract_client_states(request: HttpRequest) -> dict[str, Any]:
     qd = {
         **request.POST,
-        **request.GET,
     }
 
+    # Since HTMX 2.0, HTTP DELETE requests use parameters, rather than form encoded bodies,
+    # for their payload (This is in accordance w/ the spec.).
+    if request.method == "DELETE":
+        qd.update(request.GET)
+
     if (
-        request.method not in ("GET", "POST")
+        request.method != "POST"
         and request.content_type == "application/x-www-form-urlencoded"
     ):
         qd.update(QueryDict(request.body, encoding=request.encoding))
