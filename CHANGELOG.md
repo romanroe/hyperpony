@@ -2,6 +2,26 @@
 
 <!-- releases -->
 
+## 0.61.1 (2024-08-18)
+
+- added `SingletonPathView` to __init__.py
+
+
+## 0.61.0 (2024-08-18)
+
+- added `SingletonPathView`
+- `ElementView` now automatically embeds `ClientState` attrs
+
+- fixed client_state escaping
+
+## 0.60.6 (2024-08-18)
+
+- fixed client_state escaping
+
+## 0.60.5 (2024-08-18)
+
+- CBVs are now view stack aware
+
 ## 0.60.4 (2024-08-17)
 
 - fixed: do not create client_state on GET requests

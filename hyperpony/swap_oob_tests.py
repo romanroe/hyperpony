@@ -8,7 +8,7 @@ from hyperpony.htmx import swap_oob
 from hyperpony.response_handler import hook_swap_oob
 from hyperpony.testutils import call_with_middleware
 from hyperpony.utils import response_to_str
-from hyperpony.view import view
+from hyperpony.views import view
 
 
 def _oob1(_request):

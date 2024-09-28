@@ -129,13 +129,14 @@ def test_cbv_unisolated_request_method_setting(rf: RequestFactory):
     assert response_str == "aaa"
 
 
-def test_cbv_default_values_are_set_in_class(rf: RequestFactory):
+def test_cbv_default_values_are_set_in_instance(rf: RequestFactory):
     class V(InjectParamsView, NestedView):
         p1: str = param("aaa")
         p2: int = param(123)
 
-    assert V.p1 == "aaa"
-    assert V.p2 == 123
+    view = V()
+    assert view.p1 == "aaa"
+    assert view.p2 == 123
 
 
 #######################################################################

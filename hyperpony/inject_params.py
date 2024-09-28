@@ -53,43 +53,69 @@ def inject_params() -> Callable[[VIEW_FN], VIEW_FN]:
     return decorator
 
 
-class InjectParamsViewBase(type):
-    def __new__(cls, name, bases, attrs):
-        parents = [b for b in bases if isinstance(b, InjectParamsViewBase)]
-        if not parents:
-            return super().__new__(cls, name, bases, attrs)
-
-        params: dict[str, QueryParam] = {}
-        type_hints = attrs["__annotations__"] if "__annotations__" in attrs else {}
-        for member_name, qp in attrs.items():
-            if isinstance(qp, QueryParam):
-                qp.ignore_view_stack = True  # CBVs do not rely on the view stack
-                qp.name = member_name
-                qp.target_type = type_hints.get(
-                    member_name, type(qp.default) if qp.default is not None else str
-                )
-                qp.check()
-                params[member_name] = qp
-                attrs[member_name] = qp.default
-
-        view_class: Any = super().__new__(cls, name, bases, attrs)
-        setattr(view_class, "_hyperpony_params", params)
-        return view_class
+# class InjectParamsViewBase(type):
+#     def __new__(cls, name, bases, attrs):
+#         parents = [b for b in bases if isinstance(b, InjectParamsViewBase)]
+#         if not parents:
+#             return super().__new__(cls, name, bases, attrs)
+#
+#         params: dict[str, QueryParam] = {}
+#         type_hints = attrs["__annotations__"] if "__annotations__" in attrs else {}
+#         for member_name, qp in attrs.items():
+#             if isinstance(qp, QueryParam):
+#                 qp.ignore_view_stack = True  # CBVs do not rely on the view stack
+#                 qp.name = member_name
+#                 qp.target_type = type_hints.get(
+#                     member_name, type(qp.default) if qp.default is not None else str
+#                 )
+#                 qp.check()
+#                 params[member_name] = qp
+#                 attrs[member_name] = qp.default
+#
+#         view_class: Any = super().__new__(cls, name, bases, attrs)
+#         setattr(view_class, "_hyperpony_params", params)
+#         return view_class
 
 
 @method_decorator(view_stack(), name="dispatch")
-class InjectParamsView(View, metaclass=InjectParamsViewBase):
+class InjectParamsView(View):
+    def __new__(cls, *args, **kwargs):
+        view_class = super().__new__(cls)
+        if hasattr(cls, "__hyperpony_params"):
+            return view_class
+
+        ths = typing.get_type_hints(cls)
+        params: dict[str, QueryParam] = {}
+        for member_name, ip in inspect.getmembers(cls):
+            if isinstance(ip, QueryParam):
+                ip.ignore_view_stack = True  # CBVs do not rely on the view stack
+                ip.name = member_name
+                ip.target_type = ths.get(
+                    member_name, type(ip.default) if ip.default is not None else str
+                )
+                ip.check()
+                params[member_name] = ip
+                delattr(cls, member_name)
+
+        setattr(cls, "__hyperpony_params", params)
+        return view_class
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for k, v in kwargs.items():
-            if (qp := self.hyperpony_params().get(k, None)) and qp.default == _REQUIRED:
+            if qp := self._hyperpony_params().get(k, None):
                 qp.default = v
 
-    def hyperpony_params(self) -> dict[str, "QueryParam"]:
-        return getattr(self, "_hyperpony_params")
+        for k, v in self._hyperpony_params().items():
+            if v.default is not _REQUIRED:
+                setattr(self, k, v.default)
+
+    @classmethod
+    def _hyperpony_params(cls) -> dict[str, "QueryParam"]:
+        return getattr(cls, "__hyperpony_params")
 
     def setup(self, request, *args, **kwargs):
-        for attrvalue in self.hyperpony_params().values():
+        for attrvalue in self._hyperpony_params().values():
             value = attrvalue.get_value([request], kwargs)
             setattr(self, attrvalue.name, value)
 
@@ -298,11 +324,11 @@ class ObjectDoesNotExistWithPk(ObjectDoesNotExist):
 
 def _convert_value_to_type(values: list[Any], target_type: type):
     # List type
-    if get_origin(target_type) == list:
+    if get_origin(target_type) is list:
         list_type = get_args(target_type)[0]
         return [_convert_value_to_type([v], list_type) for v in values]
 
-    if target_type == list:
+    if target_type is list:
         return [_convert_value_to_type([v], str) for v in values]
 
     # Scalar types

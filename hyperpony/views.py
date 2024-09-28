@@ -1,25 +1,23 @@
 import functools
-from typing import Callable, cast, Optional
+from typing import Callable, cast, Optional, ClassVar, Any
 
 import wrapt
 from django import views
 from django.contrib.auth import decorators as auth_decorators
 from django.http import HttpRequest, HttpResponse, QueryDict
+from django.urls import path, reverse
 from django.utils.datastructures import MultiValueDict
+from django.utils.decorators import method_decorator
 
 import hyperpony
+from hyperpony.response_handler import RESPONSE_HANDLER, add_response_handler
 from hyperpony.utils import VIEW_FN, text_response_to_str_or_none
 from hyperpony.view_stack import view_stack
 
 
 class IsolatedRequest(wrapt.ObjectProxy):
     @classmethod
-    def wrap(
-        cls,
-        request: HttpRequest,
-        get_querydict: Optional[QueryDict] = None,
-        post_querydict: Optional[QueryDict] = None,
-    ):
+    def wrap(cls, request: HttpRequest):
         return IsolatedRequest(request)
 
     @property
@@ -72,9 +70,7 @@ def view(
         @functools.wraps(fn)
         def inner(*args, **kwargs) -> HttpResponse:
             view_request: HttpRequest = args[0]
-            # stack = get_view_fn_call_stack_from_request(view_request)
             try:
-                # stack.append(fn)
                 response = fn(view_request, *args[1:], **kwargs)
                 response = (
                     ViewResponse(response)
@@ -83,7 +79,6 @@ def view(
                 )
                 return response
             finally:
-                # stack.pop()
                 pass
 
         return cast(VIEW_FN, view_stack()(inner))
@@ -91,6 +86,7 @@ def view(
     return decorator
 
 
+@method_decorator(view_stack(), name="dispatch")
 class NestedView(views.View):
     isolate_request = True
 
@@ -108,9 +104,37 @@ class NestedView(views.View):
         response_string = text_response_to_str_or_none(response)
         return response_string if response_string is not None else str(response)
 
+    def add_response_handler(self, handler: RESPONSE_HANDLER):
+        add_response_handler(self.request, handler)
+
 
 class ElementIdMixin:
     element_id: Optional[str] = None
 
     def get_element_id(self) -> str:
         return self.element_id or self.__class__.__name__
+
+
+class ElementAttrsMixin:
+    def get_attrs(self) -> dict[str, str]:
+        return {}
+
+
+class SingletonPathMixin:
+    url_name: ClassVar[Optional[str]] = None
+
+    @classmethod
+    def create_path(cls: Any, path_segment: Optional[str] = None):
+        if cls.url_name is not None:
+            raise Exception("create_path() can only be called once per view class.")
+        if path_segment is None:
+            path_segment = cls.__name__
+        url_name = f"{cls.__module__}.{cls.__name__}".replace(".", "-")
+        cls.url_name = url_name
+        view = cls.as_view()
+        return path(path_segment, view, name=url_name)
+
+    def url(self) -> str:
+        if self.url_name is None:
+            raise Exception("View was not registered with create_path().")
+        return reverse(self.url_name)

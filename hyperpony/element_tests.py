@@ -19,6 +19,11 @@ def _assert_default_values(response: HttpResponse):
     assert "hyperpony-element" in parsed.attrib
 
 
+#######################################################################
+### function-based views
+#######################################################################
+
+
 def test_without_braces(rf: RequestFactory):
     @element()
     def viewfn(_request):
@@ -93,7 +98,12 @@ def test_classes(rf: RequestFactory):
     assert parsed.attrib["class"] == "foo bar"
 
 
-def test_class_template_view_default_settings(rf: RequestFactory):
+#######################################################################
+### classed-based views
+#######################################################################
+
+
+def test_cbv_template_view_default_settings(rf: RequestFactory):
     class V(ElementView, TemplateView):
         template_name = "hyperpony/tests/TemplateResponse.html"
 
@@ -109,7 +119,7 @@ def test_class_template_view_default_settings(rf: RequestFactory):
     assert "hyperpony-element" in parsed.attrib
 
 
-def test_class_template_view_custom_settings(rf: RequestFactory):
+def test_cbv_template_view_custom_settings(rf: RequestFactory):
     class V(ElementView, TemplateView):
         template_name = "hyperpony/tests/TemplateResponse.html"
         element_id = "SuperView"
@@ -129,3 +139,18 @@ def test_class_template_view_custom_settings(rf: RequestFactory):
     assert parsed.attrib["hx-swap"] == "innerHTML"
     assert parsed.attrib["class"] == "foo bar"
     assert "hyperpony-element" in parsed.attrib
+
+
+# def test_cbv_additional_attrs(rf: RequestFactory):
+#     class V(ElementView):
+#         def get_attrs_str(self) -> str:
+#             return f"{super().get_attrs_str()} myattr='myvalue'"
+#
+#         def get(self, request, *args, **kwargs):
+#             return HttpResponse("<div>body</div>")
+#
+#     response = V.as_view()(rf.get("/"))
+#     parsed: lxml.html.HtmlElement = lxml.html.fromstring(response_to_str(response))
+#     assert parsed.tag == "div"
+#     assert parsed.attrib["id"] == "V"
+#     assert parsed.attrib["myattr"] == "myvalue"

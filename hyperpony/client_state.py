@@ -1,20 +1,24 @@
 import dataclasses
+import inspect
 from dataclasses import dataclass
 from typing import Any, cast, Optional, Tuple
 from typing import TypeVar
 
 import orjson
 from django.http import HttpRequest, QueryDict
+from django.utils.decorators import method_decorator
+from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.generic.base import ContextMixin
 from pydantic import BaseModel, create_model
 
-from hyperpony.view import ElementIdMixin
+from hyperpony.view_stack import view_stack
+from hyperpony.views import ElementIdMixin, ElementAttrsMixin
 
 
 @dataclass()
-class ClientState:
+class ClientStateField:
     default: Any = dataclasses.field(default=None)
     client_to_server: bool = dataclasses.field(default=True)
     schema: Optional[Any] = dataclasses.field(default=None)
@@ -31,7 +35,7 @@ def client_state(
 ) -> T:
     return cast(
         T,
-        ClientState(
+        ClientStateField(
             default=default,
             client_to_server=client_to_server,
             schema=schema,
@@ -43,23 +47,26 @@ def client_state(
 class ClientStateViewConfig:
     schema_out: type[BaseModel]
     schema_in: type[BaseModel]
-    client_state_fields: dict[str, ClientState]
+    client_state_fields: dict[str, ClientStateField]
     client_to_server_excludes: list[str]
 
 
-class ClientStateViewBase(type):
-    def __new__(cls, name, bases, attrs):
-        parents = [b for b in bases if isinstance(b, ClientStateViewBase)]
-        if not parents:
-            return super().__new__(cls, name, bases, attrs)
+@method_decorator(view_stack(), name="dispatch")
+class ClientStateView(ElementAttrsMixin, ElementIdMixin, ContextMixin, View):
+    is_client_state_present = False
 
+    def __new__(cls):
+        view_class = super().__new__(cls)
+        if hasattr(cls, "__hyperpony_client_state_config"):
+            return view_class
+
+        client_state_fields: dict[str, ClientStateField] = {}
         schema_out_fields: dict[str, Tuple[Any, Any]] = {}
         schema_in_fields: dict[str, Tuple[Any, Any]] = {}
         client_to_server_excludes: list[str] = []
-        client_state_fields: dict[str, ClientState] = {}
 
-        for attrname, attrval in attrs.items():
-            if isinstance(attrval, ClientState):
+        for attrname, attrval in inspect.getmembers(cls):
+            if isinstance(attrval, ClientStateField):
                 client_state_fields[attrname] = attrval
                 target_type = (
                     attrval.schema
@@ -74,30 +81,30 @@ class ClientStateViewBase(type):
                 else:
                     schema_in_fields[attrname] = (target_type, attrval.default)
 
-                attrs[attrname] = attrval.default
+                setattr(cls, attrname, attrval.default)
 
-        prefix = f"{name}ClientState"
+        prefix = f"{cls.__name__}ClientState"
         schema_out = create_model(f"{prefix}Out", **schema_out_fields)  # type: ignore
         schema_in = create_model(f"{prefix}In", **schema_in_fields)  # type: ignore
 
-        view_class: Any = super().__new__(cls, name, bases, attrs)
         setattr(
-            view_class,
-            "_hyperpony_client_state_config",
+            cls,
+            "__hyperpony_client_state_config",
             ClientStateViewConfig(
                 schema_out, schema_in, client_state_fields, client_to_server_excludes
             ),
         )
+
         return view_class
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for k, v in self._hyperpony_client_state_config().client_state_fields.items():
+            setattr(self, k, v.default)
 
-class ClientStateView(
-    ElementIdMixin, ContextMixin, View, metaclass=ClientStateViewBase
-):
-    is_client_state_present = False
-
-    def hyperpony_client_state_config(self) -> ClientStateViewConfig:
-        return getattr(self, "_hyperpony_client_state_config")
+    @classmethod
+    def _hyperpony_client_state_config(cls) -> ClientStateViewConfig:
+        return getattr(cls, "__hyperpony_client_state_config")
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
@@ -110,7 +117,7 @@ class ClientStateView(
         if client_state := getattr(request, "_hyperpony_client_state", None):
             if client_state_element := client_state.get(self.get_element_id(), None):
                 self.is_client_state_present = True
-                config = self.hyperpony_client_state_config()
+                config = self._hyperpony_client_state_config()
                 model = config.schema_in.model_validate_json(client_state_element)
                 data = model.model_dump()
                 for k, v in data.items():
@@ -120,25 +127,35 @@ class ClientStateView(
         kwargs.setdefault("client_state_attrs", self.get_client_state_attrs())
         return super().get_context_data(**kwargs)
 
-    def get_client_state_attrs(self):
-        meta = self.hyperpony_client_state_config()
+    def get_attrs(self) -> dict[str, str]:
+        return {
+            **super().get_attrs(),
+            **self.get_client_state_dict(),
+            "x-cloak": "",
+        }
+
+    def get_client_state_dict(self) -> dict[str, str]:
+        meta = self._hyperpony_client_state_config()
         data = {}
         for k in meta.schema_out.model_fields.keys():
             data[k] = getattr(self, k)
 
         model: BaseModel = meta.schema_out(**data)
-        client_state_json = model.model_dump_json()
+        x_data = {
+            "client_state": model.model_dump(),
+            "client_to_server_excludes": meta.client_to_server_excludes,
+        }
+        x_data_str = escape(orjson.dumps(x_data).decode())
+        return {
+            "__hyperpony_client_state__": self.get_element_id(),
+            "x-data": x_data_str,
+        }
 
-        client_to_server_excludes_json = orjson.dumps(meta.client_to_server_excludes)
-        x_data = (
-            ' x-data=\'{"client_state":'
-            + client_state_json
-            + ',"client_to_server_excludes":'
-            + client_to_server_excludes_json.decode("utf-8")
-            + "}' "
+    def get_client_state_attrs(self):
+        joined = " ".join(
+            f' {k}="{v}" ' for k, v in self.get_client_state_dict().items()
         )
-        attrs = f" __hyperpony_client_state__ = '{self.get_element_id()}' {x_data} "
-        return mark_safe(attrs)
+        return mark_safe(joined)
 
 
 def _extract_client_states(request: HttpRequest) -> dict[str, Any]:

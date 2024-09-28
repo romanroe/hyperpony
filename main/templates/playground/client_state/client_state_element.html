@@ -1,0 +1,18 @@
+<h1>ClientState</h1>
+<div x-text="client_state.foo"></div>
+<div x-text="client_state.bar"></div>
+<div x-text="client_state.baz"></div>
+<hr>
+
+<div>
+    <button @click="client_state.foo = client_state.foo + 1">inc foo</button>
+</div>
+
+<div>
+    <button hx-get="{{ view.url }}">get</button>
+    <button hx-post="{{ view.url }}?met=post">post</button>
+    <button hx-put="{{ view.url }}">put</button>
+    <button hx-patch="{{ view.url }}">patch</button>
+    <button hx-delete="{{ view.url }}">delete</button>
+</div>
+

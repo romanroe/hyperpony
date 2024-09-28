@@ -31,15 +31,13 @@ def view_stack() -> Callable[[VIEW_FN], VIEW_FN]:
 
 
 @typing.overload
-def get_view_fn_call_stack_from_request(request: HttpRequest) -> list[Callable]:
-    ...
+def get_view_fn_call_stack_from_request(request: HttpRequest) -> list[Callable]: ...
 
 
 @typing.overload
 def get_view_fn_call_stack_from_request(
     request: HttpRequest, create: bool
-) -> typing.Optional[list[Callable]]:
-    ...
+) -> typing.Optional[list[Callable]]: ...
 
 
 def get_view_fn_call_stack_from_request(

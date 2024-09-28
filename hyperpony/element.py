@@ -7,7 +7,14 @@ from django_htmx.http import reswap as htmx_reswap
 from django_htmx.http import retarget as htmx_retarget
 
 from hyperpony.utils import is_response_processable, response_to_str
-from hyperpony.view import view, VIEW_FN, ViewResponse, NestedView, ElementIdMixin
+from hyperpony.views import (
+    view,
+    VIEW_FN,
+    ViewResponse,
+    NestedView,
+    ElementIdMixin,
+    ElementAttrsMixin,
+)
 
 
 # def split_content_and_swap_oob(content: str) -> Tuple[str, str]:
@@ -72,7 +79,7 @@ class ElementResponse(ViewResponse):
             attr_id = f"id='{meta.element_id}'" if meta.element_id is not None else ""
             attr_hx_target = f"hx-target='{meta.hx_target}'" if meta.hx_target else ""
             attr_hx_swap = f"hx-swap='{meta.hx_swap}'" if meta.hx_swap else ""
-            attrs_str = " ".join(f'{k}="{v}"' for k, v in meta.attrs.items())
+            attrs_str = " ".join(f' {k}="{v}" ' for k, v in meta.attrs.items())
             content = response_to_str(response)
             wrapped = (
                 f"""<{meta.tag} {attr_id} {attr_hx_target} {attr_hx_swap} {attrs_str} hyperpony-element>"""
@@ -129,14 +136,15 @@ def element(
     return decorator
 
 
-class ElementView(ElementIdMixin, NestedView):
-    __client_state_schema: type
-
+class ElementView(ElementAttrsMixin, ElementIdMixin, NestedView):
     tag: str = "div"
     hx_target: str = "this"
     hx_swap: str = "outerHTML"
     attrs: Optional[dict[str, str]] = None
     nowrap: bool = False
+
+    def get_attrs(self) -> dict[str, str]:
+        return {**super().get_attrs(), **(self.attrs or {})}
 
     def dispatch(self, request, *args, **kwargs):
         response = super().dispatch(request, *args, **kwargs)
@@ -147,6 +155,6 @@ class ElementView(ElementIdMixin, NestedView):
                 tag=self.tag,
                 hx_target=self.hx_target,
                 hx_swap=self.hx_swap,
-                attrs=self.attrs or {},
+                attrs=self.get_attrs(),
             ),
         )

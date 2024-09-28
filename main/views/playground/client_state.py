@@ -1,29 +1,33 @@
-from django.urls import path, reverse
-from django.views.generic import TemplateView
+from typing import Optional
 
-from hyperpony.client_state import ClientStateView, client_state
+from django.urls import path
 
-
-# class PersonClientState(ModelSchema):
-#     class Meta:
-#         model = Person
-#         fields = "__all__"
+from hyperpony import HyperponyElementView, param, HyperponyView
+from hyperpony.client_state import client_state
 
 
-class ClientStatePage(ClientStateView, TemplateView):
+class ClientStatePage(HyperponyView):
     template_name = "playground/client_state/client_state_page.html"
-    foo: int = client_state(1, client_to_server=True)
-    # persons: list[Person] = client_state([], model=list[PersonClientState])
 
     def get_context_data(self, **kwargs):
-        # self.persons = Person.objects.all()[:10]
-        print(self.is_client_state_present, self.foo)
-
         return super().get_context_data(**kwargs) | {
-            "url": reverse("client-state-page")
+            "element": ClientStateElement().as_str(self.request)
         }
 
+
+class ClientStateElement(HyperponyElementView):
+    template_name = "playground/client_state/client_state_element.html"
+    met: Optional[str] = param()
+    foo: int = client_state(100, client_to_server=True)
+    bar: str = client_state('abc"def', client_to_server=True)
+    baz: str = client_state("ghi'jkl", client_to_server=False)
+
+    def get_context_data(self, **kwargs):
+        print(self.is_client_state_present, self.foo, self.met)
+        return super().get_context_data(**kwargs)
+
     def post(self, request, *args, **kwargs):
+        self.add_response_handler(lambda response: print(response))
         return self.get(request, *args, **kwargs)
 
     def put(self, request, *args, **kwargs):
@@ -38,4 +42,5 @@ class ClientStatePage(ClientStateView, TemplateView):
 
 urlpatterns = [
     path("", ClientStatePage.as_view(), name="client-state-page"),
+    ClientStateElement.create_path(),
 ]

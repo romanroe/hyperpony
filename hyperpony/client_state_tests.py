@@ -28,16 +28,26 @@ class V(ClientStateView):
         return self.get(request)
 
 
-def test_client_state_default_values_are_set_in_class(rf: RequestFactory):
-    assert V.foo == "foo"
-    assert V.bar == 123
-    assert V.baz == "baz"
+def test_client_state_default_values_are_set_in_instance(rf: RequestFactory):
+    view = V()
+    assert view.foo == "foo"
+    assert view.bar == 123
+    assert view.baz == "baz"
 
 
 def test_server_to_client(rf: RequestFactory):
     req = rf.get("/")
     response = V.as_view()(req)
     parsed: lxml.html.HtmlElement = lxml.html.fromstring(response_to_str(response))
+    attr_x_data = parsed.attrib["x-data"]
+    x_data = orjson.loads(attr_x_data)
+    data = x_data["client_state"]
+    assert data["foo"] == "foo"
+    assert data["bar"] == 123
+
+    ###############
+    response = V.as_view()(req)
+    parsed = lxml.html.fromstring(response_to_str(response))
     attr_x_data = parsed.attrib["x-data"]
     x_data = orjson.loads(attr_x_data)
     data = x_data["client_state"]
