@@ -48,7 +48,7 @@ class ClientStateViewConfig:
     schema_out: type[BaseModel]
     schema_in: type[BaseModel]
     client_state_fields: dict[str, ClientStateField]
-    client_to_server_excludes: list[str]
+    client_to_server_includes: list[str]
 
 
 @method_decorator(view_stack(), name="dispatch")
@@ -63,7 +63,7 @@ class ClientStateView(ElementAttrsMixin, ElementIdMixin, ContextMixin, View):
         client_state_fields: dict[str, ClientStateField] = {}
         schema_out_fields: dict[str, Tuple[Any, Any]] = {}
         schema_in_fields: dict[str, Tuple[Any, Any]] = {}
-        client_to_server_excludes: list[str] = []
+        client_to_server_includes: list[str] = []
 
         for attrname, attrval in inspect.getmembers(cls):
             if isinstance(attrval, ClientStateField):
@@ -76,9 +76,8 @@ class ClientStateView(ElementAttrsMixin, ElementIdMixin, ContextMixin, View):
                     else str
                 )
                 schema_out_fields[attrname] = (target_type, attrval.default)
-                if not attrval.client_to_server:
-                    client_to_server_excludes.append(attrname)
-                else:
+                if attrval.client_to_server:
+                    client_to_server_includes.append(attrname)
                     schema_in_fields[attrname] = (target_type, attrval.default)
 
                 setattr(cls, attrname, attrval.default)
@@ -91,7 +90,7 @@ class ClientStateView(ElementAttrsMixin, ElementIdMixin, ContextMixin, View):
             cls,
             "__hyperpony_client_state_config",
             ClientStateViewConfig(
-                schema_out, schema_in, client_state_fields, client_to_server_excludes
+                schema_out, schema_in, client_state_fields, client_to_server_includes
             ),
         )
 
@@ -143,7 +142,7 @@ class ClientStateView(ElementAttrsMixin, ElementIdMixin, ContextMixin, View):
         model: BaseModel = meta.schema_out(**data)
         x_data = {
             "client_state": model.model_dump(),
-            "client_to_server_excludes": meta.client_to_server_excludes,
+            "client_to_server_includes": meta.client_to_server_includes,
         }
         x_data_str = escape(orjson.dumps(x_data).decode())
         return {

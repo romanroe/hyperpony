@@ -2,7 +2,7 @@ from typing import Optional
 
 from django.urls import path
 
-from hyperpony import HyperponyElementView, param, HyperponyView
+from hyperpony import HyperponyElementView, param, HyperponyView, SingletonPathMixin
 from hyperpony.client_state import client_state
 
 
@@ -15,19 +15,14 @@ class ClientStatePage(HyperponyView):
         }
 
 
-class ClientStateElement(HyperponyElementView):
+class ClientStateElement(SingletonPathMixin, HyperponyElementView):
     template_name = "playground/client_state/client_state_element.html"
     met: Optional[str] = param()
     foo: int = client_state(100, client_to_server=True)
     bar: str = client_state('abc"def', client_to_server=True)
-    baz: str = client_state("ghi'jkl", client_to_server=False)
-
-    def get_context_data(self, **kwargs):
-        print(self.is_client_state_present, self.foo, self.met)
-        return super().get_context_data(**kwargs)
+    baz: str = client_state("ghi'jkl")
 
     def post(self, request, *args, **kwargs):
-        self.add_response_handler(lambda response: print(response))
         return self.get(request, *args, **kwargs)
 
     def put(self, request, *args, **kwargs):
