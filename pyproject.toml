@@ -61,7 +61,8 @@ format = "ruff format ."
 mypy = "mypy ."
 check = ["format", "test", "mypy", "lint"]
 docswatch = "mkdocs serve"
-publish = "poetry publish --build"
+publish_upload = "poetry publish --build"
+publish = ["check", "publish_upload"]
 
 [tool.poe.tasks.check_watch]
 cwd = "."
