@@ -2,6 +2,14 @@
 
 <!-- releases -->
 
+## 0.61.3 (2024-09-28)
+
+- internal changes
+
+## 0.61.2 (2024-09-28)
+
+- internal changes
+
 ## 0.61.1 (2024-08-18)
 
 - added `SingletonPathView` to __init__.py

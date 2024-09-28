@@ -2,7 +2,7 @@ from typing import Optional
 
 from django.urls import path
 
-from hyperpony import HyperponyElementView, param, HyperponyView, SingletonPathMixin
+from hyperpony import HyperponyElementView, param, HyperponyView
 from hyperpony.client_state import client_state
 
 
@@ -15,7 +15,7 @@ class ClientStatePage(HyperponyView):
         }
 
 
-class ClientStateElement(SingletonPathMixin, HyperponyElementView):
+class ClientStateElement(HyperponyElementView):
     template_name = "playground/client_state/client_state_element.html"
     met: Optional[str] = param()
     foo: int = client_state(100, client_to_server=True)

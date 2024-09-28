@@ -8,11 +8,13 @@ from .view_stack import is_delete, is_get, is_head, is_patch, is_post, is_put
 from .views import view, NestedView, SingletonPathMixin
 
 
-class HyperponyView(ClientStateView, InjectParamsView, TemplateView):
+class HyperponyView(
+    ClientStateView, InjectParamsView, SingletonPathMixin, TemplateView
+):
     pass
 
 
 class HyperponyElementView(
-    ElementView, ClientStateView, InjectParamsView, TemplateView
+    ElementView, ClientStateView, InjectParamsView, SingletonPathMixin, TemplateView
 ):
     pass
