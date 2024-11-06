@@ -45,7 +45,6 @@ def test_server_to_client(rf: RequestFactory):
     assert data["foo"] == "foo"
     assert data["bar"] == 123
 
-    ###############
     response = V.as_view()(req)
     parsed = lxml.html.fromstring(response_to_str(response))
     attr_x_data = parsed.attrib["x-data"]

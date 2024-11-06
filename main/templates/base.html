@@ -31,7 +31,7 @@
     {% block head %}{% endblock %}
 </head>
 
-<body hx-ext="merge"
+<body hx-ext="merge, alpine-morph"
       class="container-fluid m-0 p-0"
       style="height: 100vh">
 <div id="body" class="h-100">
@@ -39,10 +39,14 @@
 </div>
 
 <script src="https://unpkg.com/htmx.org@2.0.2"></script>
+<script src="https://unpkg.com/htmx-ext-alpine-morph@2.0.0/alpine-morph.js"></script>
+
 <script src="https://unpkg.com/idiomorph/dist/idiomorph-ext.min.js"></script>
 <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
 
+<script defer src="https://unpkg.com/@alpinejs/morph@3.x.x/dist/cdn.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
 <script type="text/javascript" defer>
     document.addEventListener('alpine:init', () => {
         Alpine.directive('confirm', (el, {expression}, {cleanup}) => {

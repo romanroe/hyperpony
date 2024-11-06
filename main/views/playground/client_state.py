@@ -1,7 +1,9 @@
 from typing import Optional
 
 from django.urls import path
+from icecream import ic
 
+from demo_address_book.models import Person
 from hyperpony import HyperponyElementView, param, HyperponyView
 from hyperpony.client_state import client_state
 
@@ -18,11 +20,13 @@ class ClientStatePage(HyperponyView):
 class ClientStateElement(HyperponyElementView):
     template_name = "playground/client_state/client_state_element.html"
     met: Optional[str] = param()
-    foo: int = client_state(100, client_to_server=True)
-    bar: str = client_state('abc"def', client_to_server=True)
-    baz: str = client_state("ghi'jkl")
+    foo = client_state(100, client_to_server=True)
+    bar = client_state('abc"def', client_to_server=True)
+    baz = client_state("ghi'jkl")
+    persons: list[Person] = client_state(list(Person.objects.all()))
 
     def post(self, request, *args, **kwargs):
+        ic(self.foo)
         return self.get(request, *args, **kwargs)
 
     def put(self, request, *args, **kwargs):

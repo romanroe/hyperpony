@@ -15,7 +15,7 @@
 
     <div x-text="client_state.foo"></div>
     <div x-text="client_state.bar"></div>
-    <div x-text="client_state.baz"></div>
+    <input x-model="client_state.baz"></input>
     <hr>
 
     <div>
@@ -28,6 +28,12 @@
         <button hx-put="{{ view.url }}">put</button>
         <button hx-patch="{{ view.url }}">patch</button>
         <button hx-delete="{{ view.url }}">delete</button>
+    </div>
+
+    <hr>
+    
+    <div x-data="{inner: 'inner'}">
+        <input x-model="inner"/>
     </div>
 
 </div>
