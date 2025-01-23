@@ -20,9 +20,7 @@ def response_to_str(response: HttpResponseBase | TemplateResponse) -> SafeString
     return mark_safe(str(response.content, "utf-8"))
 
 
-def is_response_processable(
-    response: HttpResponseBase, content_type_start: str
-) -> bool:
+def is_response_processable(response: HttpResponseBase, content_type_start: str) -> bool:
     if isinstance(response, HttpResponse) and response.streaming:
         return False
 

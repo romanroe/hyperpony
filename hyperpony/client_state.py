@@ -6,14 +6,12 @@ from typing import TypeVar
 
 import orjson
 from django.http import HttpRequest, QueryDict
-from django.utils.decorators import method_decorator
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.generic.base import ContextMixin
 from pydantic import BaseModel, create_model
 
-from hyperpony.view_stack import view_stack
 from hyperpony.views import ElementIdMixin, ElementAttrsMixin
 
 
@@ -51,8 +49,7 @@ class ClientStateViewConfig:
     client_to_server_includes: list[str]
 
 
-@method_decorator(view_stack(), name="dispatch")
-class ClientStateView(ElementAttrsMixin, ElementIdMixin, ContextMixin, View):
+class ClientStateMixin(ElementAttrsMixin, ElementIdMixin, ContextMixin, View):
     is_client_state_present = False
 
     def __new__(cls):
@@ -108,9 +105,7 @@ class ClientStateView(ElementAttrsMixin, ElementIdMixin, ContextMixin, View):
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
 
-        if getattr(request, "htmx", False) and not hasattr(
-            request, "_hyperpony_client_state"
-        ):
+        if getattr(request, "htmx", False) and not hasattr(request, "_hyperpony_client_state"):
             setattr(request, "_hyperpony_client_state", _extract_client_states(request))
 
         if client_state := getattr(request, "_hyperpony_client_state", None):
@@ -151,9 +146,7 @@ class ClientStateView(ElementAttrsMixin, ElementIdMixin, ContextMixin, View):
         }
 
     def get_client_state_attrs(self):
-        joined = " ".join(
-            f' {k}="{v}" ' for k, v in self.get_client_state_dict().items()
-        )
+        joined = " ".join(f' {k}="{v}" ' for k, v in self.get_client_state_dict().items())
         return mark_safe(joined)
 
 
@@ -167,10 +160,7 @@ def _extract_client_states(request: HttpRequest) -> dict[str, Any]:
     if request.method == "DELETE":
         qd.update(request.GET)
 
-    if (
-        request.method != "POST"
-        and request.content_type == "application/x-www-form-urlencoded"
-    ):
+    if request.method != "POST" and request.content_type == "application/x-www-form-urlencoded":
         qd.update(QueryDict(request.body, encoding=request.encoding))
 
     client_states = {}

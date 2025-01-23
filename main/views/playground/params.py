@@ -1,10 +1,10 @@
 from django.urls import path
 from django.views.generic import TemplateView
 
-from hyperpony.inject_params import InjectParamsView, param
+from hyperpony.inject_params import InjectParamsMixin, param
 
 
-class ParamsPage(InjectParamsView, TemplateView):
+class ParamsPage(InjectParamsMixin, TemplateView):
     template_name = "playground/params/params_page.html"
     value: str = param("undefined")
 

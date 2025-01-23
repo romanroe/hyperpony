@@ -1,50 +1,20 @@
-import pytest
-from django.test import RequestFactory
 from django.http import HttpResponse
+from django.test import RequestFactory
+from django.views import View
 
-from hyperpony import element, view
-from hyperpony.response_handler import add_response_handler
-from hyperpony.testutils import call_with_middleware
-
-
-def test_process_response_can_only_be_called_from_hyperpony_views(rf: RequestFactory):
-    def root(request):
-        add_response_handler(request, lambda response: response)
-        return HttpResponse("")
-
-    with pytest.raises(
-        Exception,
-        match="This function can only be called from within a Hyperpony view.",
-    ):
-        root(rf.get("/"))
+from hyperpony import ViewUtilsMixin
+from hyperpony.response_handler import process_response
+from hyperpony.utils import response_to_str
 
 
-def test_process_response_hook(rf: RequestFactory):
-    state = []
+def test_viewutils_add_swap_oob(rf: RequestFactory):
+    class ViewWithOOBContent(ViewUtilsMixin, View):
+        def dispatch(self, request, *args, **kwargs):
+            self.add_swap_oob(HttpResponse("<div id='oob'>OOB</div>"))
+            return HttpResponse("main")
 
-    @view()
-    def root(request):
-        add_response_handler(request, lambda response: state.append(1))
-        return HttpResponse("")
-
-    call_with_middleware(rf, root)
-    assert state[0] == 1
-
-
-def test_process_response_hook_with_nested_elements(rf: RequestFactory):
-    state = []
-
-    @view()
-    def root(request):
-        add_response_handler(request, lambda response: state.append(1))
-        return HttpResponse(f"{child(request)}")
-
-    @element()
-    def child(request):
-        add_response_handler(request, lambda response: state.append(2))
-        return HttpResponse("child")
-
-    call_with_middleware(rf, root)
-    assert len(state) == 2
-    assert state[0] == 1
-    assert state[1] == 2
+    req = rf.get("/")
+    res = ViewWithOOBContent.as_view()(req)
+    res = process_response(req, res)
+    res_str = response_to_str(res)
+    assert res_str == 'main<div id="oob" hx-swap-oob="outerHTML:#oob">OOB</div>'

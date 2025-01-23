@@ -1,156 +1,106 @@
 import django
 import lxml.html
-from django.http import HttpResponse
-from django.template.response import TemplateResponse
+
+
+from django.http import HttpResponse, HttpResponseBase
 from django.test import RequestFactory
+from django.views import View
 from django.views.generic import TemplateView
 
-from hyperpony import element, ElementResponse
-from hyperpony.element import ElementMeta, ElementView
+from hyperpony import ElementMixin
+from hyperpony.element import ElementMeta, ElementResponse
 from hyperpony.utils import response_to_str
 
 
-def _assert_default_values(response: HttpResponse):
+def _assert_element_values(
+    response: HttpResponseBase,
+    tag="div",
+    element_id="TView",
+    hx_target="this",
+    hx_swap="outerHTML",
+):
     parsed: lxml.html.HtmlElement = lxml.html.fromstring(response_to_str(response))
-    assert parsed.tag == "div"
-    assert parsed.attrib["id"] == "viewfn"
-    assert parsed.attrib["hx-target"] == "this"
-    assert parsed.attrib["hx-swap"] == "outerHTML"
+    assert parsed.tag == tag
+    assert parsed.attrib["id"] == element_id
+    assert parsed.attrib["hx-target"] == hx_target
+    assert parsed.attrib["hx-swap"] == hx_swap
     assert "hyperpony-element" in parsed.attrib
 
 
-#######################################################################
-### function-based views
-#######################################################################
+def test_element_view_defaults(rf: RequestFactory):
+    class TView(ElementMixin, View):
+        def get(self, request, *args, **kwargs):
+            return HttpResponse("")
+
+    res = TView.as_view()(rf.get("/"))
+    _assert_element_values(res)
 
 
-def test_without_braces(rf: RequestFactory):
-    @element()
-    def viewfn(_request):
-        return HttpResponse("")
+def test_element_view_attrib_change(rf: RequestFactory):
+    class TView(ElementMixin, View):
+        element_id = "foo"
+        tag = "spam"
+        hx_swap = "egg"
 
-    result = viewfn(rf.get("/"))
-    _assert_default_values(result)
+        def get(self, request, *args, **kwargs):
+            return HttpResponse("")
+
+    res = TView.as_view()(rf.get("/"))
+    _assert_element_values(res, element_id="foo", tag="spam", hx_swap="egg")
 
 
-def test_config(rf: RequestFactory):
-    @element("foo", tag="span", hx_target="spam", hx_swap="egg")
-    def viewfn(_request):
-        return HttpResponse("body")
+def test_element_view_attrs(rf: RequestFactory):
+    class TView(ElementMixin, View):
+        attrs = {"class": "bar"}
 
-    response = viewfn(rf.get("/"))
-    parsed: lxml.html.HtmlElement = lxml.html.fromstring(response_to_str(response))
-    assert parsed.tag == "span"
-    assert parsed.attrib["id"] == "foo"
-    assert parsed.attrib["hx-target"] == "spam"
-    assert parsed.attrib["hx-swap"] == "egg"
+        def get(self, request, *args, **kwargs):
+            return HttpResponse("")
+
+    res = TView.as_view()(rf.get("/"))
+    _assert_element_values(res)
+    assert 'class="bar"' in response_to_str(res)
 
 
 def test_element_return_another_element(rf: RequestFactory):
-    @element()
-    def root(request):
-        return child(request)
+    class TViewParent(ElementMixin, View):
+        def get(self, request, *args, **kwargs):
+            return TViewChild.as_view()(request)
 
-    @element()
-    def child(_request):
-        return HttpResponse("child")
+    class TViewChild(ElementMixin, View):
+        def get(self, request, *args, **kwargs):
+            return HttpResponse("2")
 
-    result = root(rf.get("/"))
-    parsed: lxml.html.HtmlElement = lxml.html.fromstring(response_to_str(result))
-    assert parsed.attrib["id"] == "child"
-    assert len(parsed.getchildren()) == 0
+    res = TViewParent.as_view()(rf.get("/"))
+    _assert_element_values(res, element_id="TViewChild")
 
 
 def test_element_return_element_response(rf: RequestFactory):
-    @element("unused")
-    def viewfn(_request):
-        return ElementResponse.wrap(
-            HttpResponse("body"), ElementMeta(element_id="override")
-        )
+    class TView(ElementMixin, View):
+        def get(self, request, *args, **kwargs):
+            return ElementResponse.wrap(HttpResponse("body"), ElementMeta(element_id="override"))
 
-    result = viewfn(rf.get("/"))
-    parsed: lxml.html.HtmlElement = lxml.html.fromstring(response_to_str(result))
-    assert parsed.attrib["id"] == "override"
+    res = TView.as_view()(rf.get("/"))
+    _assert_element_values(res, element_id="override")
+
+
+def test_element_nowrap(rf: RequestFactory):
+    class TView(ElementMixin, View):
+        def get(self, request, *args, **kwargs):
+            return ElementResponse.nowrap(HttpResponse("body"))
+
+    content = response_to_str(TView.as_view()(rf.get("/")))
+    assert content == "body"
 
 
 def test_element_return_template_http_response(rf: RequestFactory):
     django.setup()
 
-    @element()
-    def viewfn(request):
-        return TemplateResponse(
-            request, "hyperpony/tests/TemplateResponse.html", {"foo": 123}
-        )
-
-    result = viewfn(rf.get("/"))
-    parsed: lxml.html.HtmlElement = lxml.html.fromstring(response_to_str(result))
-    assert parsed.attrib["id"] == "viewfn"
-    assert parsed.text.strip() == "123"
-
-
-def test_classes(rf: RequestFactory):
-    @element(attrs={"class": "foo bar"})
-    def viewfn(_request):
-        return HttpResponse("body")
-
-    response = viewfn(rf.get("/"))
-    parsed: lxml.html.HtmlElement = lxml.html.fromstring(response_to_str(response))
-    assert parsed.attrib["class"] == "foo bar"
-
-
-#######################################################################
-### classed-based views
-#######################################################################
-
-
-def test_cbv_template_view_default_settings(rf: RequestFactory):
-    class V(ElementView, TemplateView):
+    class TView(ElementMixin, TemplateView):
         template_name = "hyperpony/tests/TemplateResponse.html"
 
         def get_context_data(self, **kwargs):
             return {"foo": "bar"}
 
-    response = V.as_view()(rf.get("/"))
-    parsed: lxml.html.HtmlElement = lxml.html.fromstring(response_to_str(response))
-    assert parsed.tag == "div"
-    assert parsed.attrib["id"] == "V"
-    assert parsed.attrib["hx-target"] == "this"
-    assert parsed.attrib["hx-swap"] == "outerHTML"
-    assert "hyperpony-element" in parsed.attrib
-
-
-def test_cbv_template_view_custom_settings(rf: RequestFactory):
-    class V(ElementView, TemplateView):
-        template_name = "hyperpony/tests/TemplateResponse.html"
-        element_id = "SuperView"
-        tag = "span"
-        hx_target = "body"
-        hx_swap = "innerHTML"
-        attrs = {"class": "foo bar"}
-
-        def get_context_data(self, **kwargs):
-            return {"foo": "bar"}
-
-    response = V.as_view()(rf.get("/"))
-    parsed: lxml.html.HtmlElement = lxml.html.fromstring(response_to_str(response))
-    assert parsed.tag == "span"
-    assert parsed.attrib["id"] == "SuperView"
-    assert parsed.attrib["hx-target"] == "body"
-    assert parsed.attrib["hx-swap"] == "innerHTML"
-    assert parsed.attrib["class"] == "foo bar"
-    assert "hyperpony-element" in parsed.attrib
-
-
-# def test_cbv_additional_attrs(rf: RequestFactory):
-#     class V(ElementView):
-#         def get_attrs_str(self) -> str:
-#             return f"{super().get_attrs_str()} myattr='myvalue'"
-#
-#         def get(self, request, *args, **kwargs):
-#             return HttpResponse("<div>body</div>")
-#
-#     response = V.as_view()(rf.get("/"))
-#     parsed: lxml.html.HtmlElement = lxml.html.fromstring(response_to_str(response))
-#     assert parsed.tag == "div"
-#     assert parsed.attrib["id"] == "V"
-#     assert parsed.attrib["myattr"] == "myvalue"
+    c = response_to_str(TView.as_view()(rf.get("/")))
+    assert "<div id='TView' hx-target='this' hx-swap='outerHTML'  hyperpony-element>" in c
+    assert "bar" in c

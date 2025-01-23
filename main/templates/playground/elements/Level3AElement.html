@@ -5,7 +5,7 @@
 <br>
 {{ source }}
 
-<form hx-post="{% url "level3a_element" %}">
+<form hx-post="{{ view.url }}">
     <div>
         <button name="action" value="page">Refresh Page</button>
     </div>

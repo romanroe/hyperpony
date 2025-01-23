@@ -2,6 +2,19 @@
 
 <!-- releases -->
 
+## 0.70.2 (2025-01-22)
+
+-  add PATH to param's methods
+- fixed request.user bug
+
+## 0.70.1 (2025-01-22)
+
+-  `SingletonPathMixin.create_path()` now accepts optional `name` parameter
+
+## 0.70.0 (2025-01-21)
+
+- only support for CBV
+
 ## 0.61.3 (2024-09-28)
 
 - internal changes

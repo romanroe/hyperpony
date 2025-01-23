@@ -1,20 +1,17 @@
 # ruff: noqa: F401
-from django.views.generic import TemplateView
+from django.views import View as DjangoView
 
-from .client_state import ClientStateView
-from .element import element, ElementResponse, ElementView
-from .inject_params import inject_params, param, InjectParamsView
-from .view_stack import is_delete, is_get, is_head, is_patch, is_post, is_put
-from .views import view, NestedView, SingletonPathMixin
+from .client_state import ClientStateMixin
+from .element import ElementResponse, ElementMixin
+from .inject_params import param, InjectParamsMixin
+from .views import SingletonPathMixin, ViewUtilsMixin
 
 
-class HyperponyView(
-    ClientStateView, InjectParamsView, SingletonPathMixin, TemplateView
-):
+class HyperponyView(InjectParamsMixin, DjangoView, ViewUtilsMixin):
     pass
 
 
-class HyperponyElementView(
-    ElementView, ClientStateView, InjectParamsView, SingletonPathMixin, TemplateView
+class HyperponyElementMixin(
+    InjectParamsMixin, ClientStateMixin, ElementMixin, DjangoView, ViewUtilsMixin
 ):
     pass

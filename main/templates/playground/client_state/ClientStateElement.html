@@ -1,4 +1,4 @@
-<script type="text/javascript">
+<script>
     function clientStateElementData() {
         return {
             test() {
@@ -20,6 +20,7 @@
 
     <div>
         <button @click="client_state.foo = client_state.foo + 1">inc foo</button>
+        <button hp-action-click="action">test</button>
     </div>
 
     <div>
@@ -31,9 +32,10 @@
     </div>
 
     <hr>
-    
+
     <div x-data="{inner: 'inner'}">
         <input x-model="inner"/>
     </div>
 
 </div>
+

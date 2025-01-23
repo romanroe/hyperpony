@@ -4,7 +4,7 @@ from typing import Any, cast, Mapping, TypeVar
 from django.forms import BaseForm, BoundField, Field
 from django.http import HttpRequest, QueryDict
 
-from hyperpony import is_patch, is_post, is_put
+from hyperpony.views import is_post, is_put, is_patch
 
 
 T_FORM = TypeVar("T_FORM", bound=BaseForm)

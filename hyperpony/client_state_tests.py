@@ -3,11 +3,11 @@ import orjson
 from django.http import HttpResponse
 from django.test import RequestFactory
 
-from hyperpony.client_state import ClientStateView, client_state
+from hyperpony.client_state import ClientStateMixin, client_state
 from hyperpony.utils import response_to_str
 
 
-class V(ClientStateView):
+class V(ClientStateMixin):
     foo: str = client_state("foo", client_to_server=True)
     bar: int = client_state(123, client_to_server=True)
     baz: str = client_state("baz")
