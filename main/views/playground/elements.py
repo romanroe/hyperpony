@@ -7,12 +7,12 @@ from django.views.generic import TemplateView
 from htpy import br, render_node, h3, Node, button
 from icecream import ic
 
-from hyperpony import SingletonPathMixin, HyperponyElementMixin, param, HyperponyView
+from hyperpony import SingletonPathMixin, HyperponyElementMixin, param, HyperponyMixin
 from hyperpony.htmx import swap_body
 from hyperpony.views import invoke_view
 
 
-class HtpyView(View):
+class _HtpyView(View):
     # noinspection PyUnusedLocal
     def get(self, request, *args, **kwargs):
         return HttpResponse(render_node(self.render(request, *args, **kwargs)))
@@ -22,14 +22,14 @@ class HtpyView(View):
         return None
 
 
-class Level1PageView(SingletonPathMixin, HyperponyView, TemplateView):
+class Level1PageView(SingletonPathMixin, HyperponyMixin, TemplateView):
     template_name = "playground/elements/Level1Page.html"
 
     def get_context_data(self, **kwargs):
         return {
             **super().get_context_data(**kwargs),
             "timestamp": datetime.now().microsecond,
-            "level2_element": Level2Element.embed(self.request, {"source": "page"}),
+            "level2_element": Level2Element.embed(self.request, GET={"source": "page"}),
         }
 
 
@@ -42,8 +42,8 @@ class Level2Element(SingletonPathMixin, HyperponyElementMixin, TemplateView):
             **super().get_context_data(**kwargs),
             "timestamp": datetime.now().microsecond,
             "source": self.source,
-            "level3a_element": Level3AElement.embed(self.request, {"source": self.source}),
-            "level3b_element": Level3BElement.embed(self.request, {"source": self.source}),
+            "level3a_element": Level3AElement.embed(self.request, GET={"source": self.source}),
+            "level3b_element": Level3BElement.embed(self.request, GET={"source": self.source}),
         }
 
 
@@ -58,9 +58,9 @@ class Level3AElement(SingletonPathMixin, HyperponyElementMixin, TemplateView):
                 res = swap_body(invoke_view(self.request, "level1_page"))
                 return res
             case "2":
-                Level2Element.swap_oob(self.request, {"source": "Level3AElement"})
+                Level2Element.swap_oob(self.request, GET={"source": "Level3AElement"})
             case "3a_3b":
-                Level3BElement.swap_oob(self.request, {"source": "Level3AElement"})
+                Level3BElement.swap_oob(self.request, GET={"source": "Level3AElement"})
             case "replace":
                 return Level3BElement.invoke(self.request)
 
@@ -68,7 +68,6 @@ class Level3AElement(SingletonPathMixin, HyperponyElementMixin, TemplateView):
         return response
 
     def post(self, request, *args, **kwargs):
-        ic("Level3AElement.post")
         return self.get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -79,13 +78,14 @@ class Level3AElement(SingletonPathMixin, HyperponyElementMixin, TemplateView):
         }
 
 
-class Level3BElement(SingletonPathMixin, HyperponyElementMixin, HtpyView):
+class Level3BElement(SingletonPathMixin, HyperponyElementMixin, _HtpyView):
     element_id = "l3b"
     tag = "span"
     source = param("???")
 
-    def handle_post(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         ic("Level3BElement.post")
+        return self.get(request, *args, **kwargs)
 
     def render(self, request, *args, **kwargs):
         return [
@@ -93,7 +93,7 @@ class Level3BElement(SingletonPathMixin, HyperponyElementMixin, HtpyView):
             datetime.now().microsecond,
             br,
             self.source,
-            button(hx_post=self.url())["refresh"],
+            button(hx_post=self.path)["refresh"],
         ]
 
 

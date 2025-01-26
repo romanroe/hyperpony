@@ -1,18 +1,22 @@
 from typing import Optional
+from uuid import uuid4
 
 import orjson.orjson
 import pytest
+from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpResponse
 from django.test import RequestFactory
 from django.urls import path
 from django.views import View
 from django.views.generic import TemplateView
+from pytest_mock import MockerFixture
 
 from hyperpony import param
-from hyperpony.inject_params import InjectParamsMixin
+from hyperpony.inject_params import InjectParamsMixin, ObjectDoesNotExistWithPk
 from hyperpony.testutils import view_from_response
 from hyperpony.utils import response_to_str
-from hyperpony.views import invoke_view
+from hyperpony.views import invoke_view, embed_view
+from main.models import AppUser
 
 
 # #######################################################################
@@ -43,11 +47,34 @@ class TViewOrigins(InjectParamsMixin, ViewWithSelfInResponse):
     p_delete: str = param("")
     p_path: str = param("")
     p_kwargs: str = param("")
+    p_view_kwargs: str = param("", origins=["KWARGS"])
+
+
+class TViewModel(InjectParamsMixin, ViewWithSelfInResponse):
+    p1: AppUser = param()
+
+
+class TViewModelRouteParam(InjectParamsMixin, View):
+    user: AppUser = param()
+
+    def dispatch(self, request, *args, **kwargs):
+        return HttpResponse(f"{self.user.id} {self.user.username}")
+
+
+class TViewModelLoaderFn(InjectParamsMixin, ViewWithSelfInResponse):
+    p1: AppUser = param(model_loader=lambda v: AppUser(id=v, username=f"created_{v}"))
 
 
 urlpatterns = [
     path("tviewp1/", TViewP1.as_view(), name="tviewp1"),
     path("tview_origins/<str:p_path>", TViewOrigins.as_view(p_kwargs="ddd"), name="tview-origins"),
+    path("tview_model/", TViewModel.as_view(), name="tview-model"),
+    path(
+        "TViewModelRouteParam/<uuid:user>",
+        TViewModelRouteParam.as_view(),
+        name="tview-model-route-param",
+    ),
+    path("tview_model_loader_fn/", TViewModelLoaderFn.as_view(), name="tview-model-loader-fn"),
 ]
 
 
@@ -203,7 +230,6 @@ def test_optional_as_union_with_type_conversion(rf: RequestFactory):
 #######################################################################
 
 
-@pytest.mark.urls("hyperpony.inject_params_tests")
 def test_inject_params_origins(rf: RequestFactory):
     as_view = TViewOrigins.as_view(p_kwargs="kwargs")
 
@@ -248,15 +274,17 @@ def test_inject_params_origins_embedded_request(rf: RequestFactory):
         invoke_view(
             rf.post("/?"),
             "tview-origins",
-            {"p_get": "aaa"},
-            {"p_post": "bbb"},
-            kwargs={"p_path": "ccc"},
+            GET={"p_get": "aaa"},
+            POST={"p_post": "bbb"},
+            kwargs=dict(p_path="ccc"),
+            view_kwargs={"p_view_kwargs": "vvv"},
         ),
     )
     assert view.p_get == "aaa"
     assert view.p_post == "bbb"
     assert view.p_path == "ccc"
     assert view.p_kwargs == "ddd"
+    assert view.p_view_kwargs == "vvv"
 
 
 @pytest.mark.urls("hyperpony.inject_params_tests")
@@ -334,84 +362,126 @@ def test_inject_params_type_conversion_list_unannotated(rf: RequestFactory):
     assert "2" in view.p1
 
 
-# @pytest.mark.django_db
-# def test_type_conversion_model(rf: RequestFactory):
-#     @inject_params()
-#     def viewfn(_request, user: AppUser = param()):
-#         assert user is not None
-#
-#     app_user = AppUser.objects.create(username="testuser")
-#     viewfn(rf.get(f"/?user={app_user.id}"))
-#
-#
-# @pytest.mark.django_db
-# def test_type_conversion_model_wrong_id_object_does_not_exist_type(rf: RequestFactory):
-#     @inject_params()
-#     def viewfn(_request, user: AppUser | ObjectDoesNotExist = param()):
-#         assert isinstance(user, ObjectDoesNotExist)
-#
-#     viewfn(rf.get(f"/?user={uuid4()}"))
-#
-#
-# @pytest.mark.django_db
-# def test_type_conversion_model_wrong_id_object_does_not_exist__with_pktype(
-#     rf: RequestFactory,
-# ):
-#     wrong_id = uuid4()
-#
-#     @inject_params()
-#     def viewfn(_request, user: AppUser | ObjectDoesNotExistWithPk = param()):
-#         assert isinstance(user, ObjectDoesNotExistWithPk)
-#         assert user.pk == str(wrong_id)
-#
-#     viewfn(rf.get(f"/?user={wrong_id}"))
-#
-#
-# @pytest.mark.django_db
-# def test_type_conversion_model_wrong_id_model_does_not_exist_type(rf: RequestFactory):
-#     @inject_params()
-#     def viewfn(_request, user: AppUser | AppUser.DoesNotExist = param()):  # type: ignore
-#         assert isinstance(user, AppUser.DoesNotExist)
-#
-#     viewfn(rf.get(f"/?user={uuid4()}"))
-#
-#
-# @pytest.mark.django_db
-# def test_type_conversion_model_with_optional(rf: RequestFactory):
-#     @inject_params()
-#     def viewfn(_request, user: Optional[AppUser] = param()):
-#         assert user is not None
-#
-#     app_user = AppUser.objects.create(username="testuser")
-#     viewfn(rf.get(f"/?user={app_user.id}"))
-#
-#
-# @pytest.mark.django_db
-# def test_type_conversion_model_with_optional_value_is_none(rf: RequestFactory):
-#     @inject_params()
-#     def viewfn(_request, user: Optional[AppUser] = param()):
-#         assert user is None
-#
-#     viewfn(rf.get("/"))
-#
-#
-# @pytest.mark.django_db
-# def test_type_conversion_model_with_union_none(rf: RequestFactory):
-#     @inject_params()
-#     def viewfn(_request, user: AppUser | None = param()):
-#         assert user is not None
-#
-#     app_user = AppUser.objects.create(username="testuser")
-#     viewfn(rf.get(f"/?user={app_user.id}"))
-#
-#
-# @pytest.mark.django_db
-# def test_type_conversion_model_with_union_none_value_is_none(rf: RequestFactory):
-#     @inject_params()
-#     def viewfn(_request, user: AppUser | None = param()):
-#         assert user is None
-#
-#     viewfn(rf.get("/"))
+@pytest.mark.django_db
+@pytest.mark.urls("hyperpony.inject_params_tests")
+def test_inject_params_type_conversion_model(rf: RequestFactory):
+    app_user = AppUser.objects.create(username="testuser")
+
+    # pass model's PK
+    view = view_from_response(
+        TViewModel, invoke_view(rf.get("/"), "tview-model", GET=dict(p1=app_user.id))
+    )
+    assert view.p1 == app_user
+
+    # pass model instance
+    view = view_from_response(
+        TViewModel, invoke_view(rf.get("/"), "tview-model", view_kwargs=dict(p1=app_user))
+    )
+    assert view.p1 == app_user
+
+
+@pytest.mark.django_db
+@pytest.mark.urls("hyperpony.inject_params_tests")
+def test_inject_params_type_conversion_model_with_pk_as_route_param(
+    rf: RequestFactory, mocker: MockerFixture
+):
+    app_user = AppUser.objects.create(username="testuser")
+
+    # spy
+    spy = mocker.spy(AppUser.objects, "get")
+
+    # pass model's PK to route
+    content = embed_view(rf.get("/"), "tview-model-route-param", kwargs=dict(user=app_user.id))
+    assert f"{app_user.id} {app_user.username}" in content
+    spy.assert_called_once_with(pk=app_user.id)
+
+
+@pytest.mark.django_db
+@pytest.mark.urls("hyperpony.inject_params_tests")
+def test_inject_params_type_conversion_model_with_instance_as_route_param(
+    rf: RequestFactory, mocker: MockerFixture
+):
+    app_user = AppUser.objects.create(username="testuser")
+    spy = mocker.spy(AppUser.objects, "get")
+
+    # pass model instance to route
+    content = embed_view(rf.get("/"), "tview-model-route-param", kwargs=dict(user=app_user))
+    assert f"{app_user.id} {app_user.username}" in content
+    assert spy.call_count == 0
+
+
+@pytest.mark.django_db
+@pytest.mark.urls("hyperpony.inject_params_tests")
+def test_inject_params_type_conversion_model_provide_instance_with_view_kwargs(
+    rf: RequestFactory, mocker: MockerFixture
+):
+    app_user = AppUser.objects.create(username="testuser")
+    spy = mocker.spy(AppUser.objects, "get")
+    content = embed_view(
+        rf.get("/"),
+        "tview-model-route-param",
+        kwargs=dict(user=uuid4()),
+        view_kwargs=dict(user=app_user),
+    )
+    assert f"{app_user.id} {app_user.username}" in content
+    assert spy.call_count == 0
+
+
+@pytest.mark.django_db
+@pytest.mark.urls("hyperpony.inject_params_tests")
+def test_inject_params_type_conversion_model_loader_fn(rf: RequestFactory):
+    view = view_from_response(
+        TViewModelLoaderFn, invoke_view(rf.get("/"), "tview-model-loader-fn", GET=dict(p1=1))
+    )
+    assert view.p1.id == 1
+    assert view.p1.username == "created_1"
+
+
+@pytest.mark.django_db
+def test_type_conversion_model_wrong_id_object_does_not_exist(rf: RequestFactory):
+    class V(InjectParamsMixin, ViewWithSelfInResponse):
+        user: AppUser | ObjectDoesNotExist = param()
+
+    view = view_from_response(V, V.as_view()(rf.get(f"/?user={uuid4()}")))
+    assert isinstance(view.user, ObjectDoesNotExist)
+
+
+@pytest.mark.django_db
+def test_type_conversion_model_wrong_id_object_does_not_exist_with_pktype(rf: RequestFactory):
+    class V(InjectParamsMixin, ViewWithSelfInResponse):
+        user: AppUser | ObjectDoesNotExistWithPk = param()
+
+    u = uuid4()
+    view = view_from_response(V, V.as_view()(rf.get(f"/?user={u}")))
+    assert isinstance(view.user, ObjectDoesNotExistWithPk)
+    assert view.user.pk == str(u)
+
+
+@pytest.mark.django_db
+def test_type_conversion_model_wrong_id_object_does_not_exist_type(rf: RequestFactory):
+    class V(InjectParamsMixin, ViewWithSelfInResponse):
+        user: AppUser | AppUser.DoesNotExist = param()  # type: ignore
+
+    view = view_from_response(V, V.as_view()(rf.get(f"/?user={uuid4()}")))
+    assert isinstance(view.user, AppUser.DoesNotExist)
+
+
+@pytest.mark.django_db
+def test_type_conversion_model_wrong_id_union_optional(rf: RequestFactory):
+    class V(InjectParamsMixin, ViewWithSelfInResponse):
+        user: AppUser | None = param()
+
+    view = view_from_response(V, V.as_view()(rf.get(f"/?user={uuid4()}")))
+    assert view.user is None
+
+
+@pytest.mark.django_db
+def test_type_conversion_model_wrong_id_optional(rf: RequestFactory):
+    class V(InjectParamsMixin, ViewWithSelfInResponse):
+        user: Optional[AppUser] = param()
+
+    view = view_from_response(V, V.as_view()(rf.get(f"/?user={uuid4()}")))
+    assert view.user is None
 
 
 # def test_get_and_post_order(rf: RequestFactory):

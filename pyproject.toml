@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hyperpony"
-version = "0.70.4"
+version = "0.71.16"
 description = "Django library for building web applications with htmx"
 authors = ["Roman Roelofsen <romanroe@gmail.com>"]
 license = "MIT"
@@ -25,6 +25,7 @@ wrapt = "^1.15.0"
 pydantic = "^2.8.2"
 orjson = "^3.10.6"
 django-ninja = "^1.2.1"
+pytest-mock = "^3.14.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.4"

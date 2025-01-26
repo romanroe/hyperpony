@@ -7,7 +7,7 @@ urlpatterns = [
     # path("playground/params/", include("main.views.playground.params")),
     path("playground/elements/", include("main.views.playground.elements")),
     # path("playground/page/", include("main.views.playground.page")),
-    # path("playground/client_state/", include("main.views.playground.client_state")),
+    path("playground/client_state/", include("main.views.playground.client_state")),
     # path("form/", include("main.views.form")),
     # path("demos/", include("main.views.demos")),
     # path("demo_address_book/fbv/", include("demo_address_book.views_fbv")),

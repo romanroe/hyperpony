@@ -8,7 +8,6 @@ import orjson
 from django.http import HttpRequest, QueryDict
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
-from django.views import View
 from django.views.generic.base import ContextMixin
 from pydantic import BaseModel, create_model
 
@@ -49,13 +48,13 @@ class ClientStateViewConfig:
     client_to_server_includes: list[str]
 
 
-class ClientStateMixin(ElementAttrsMixin, ElementIdMixin, ContextMixin, View):
+class ClientStateMixin(ElementAttrsMixin, ElementIdMixin, ContextMixin):
     is_client_state_present = False
 
-    def __new__(cls):
-        view_class = super().__new__(cls)
+    def __process_hyperpony_client_states(self) -> ClientStateViewConfig:
+        cls = self.__class__
         if hasattr(cls, "__hyperpony_client_state_config"):
-            return view_class
+            return getattr(cls, "__hyperpony_client_state_config")
 
         client_state_fields: dict[str, ClientStateField] = {}
         schema_out_fields: dict[str, Tuple[Any, Any]] = {}
@@ -83,27 +82,17 @@ class ClientStateMixin(ElementAttrsMixin, ElementIdMixin, ContextMixin, View):
         schema_out = create_model(f"{prefix}Out", **schema_out_fields)  # type: ignore
         schema_in = create_model(f"{prefix}In", **schema_in_fields)  # type: ignore
 
-        setattr(
-            cls,
-            "__hyperpony_client_state_config",
-            ClientStateViewConfig(
-                schema_out, schema_in, client_state_fields, client_to_server_includes
-            ),
+        config = ClientStateViewConfig(
+            schema_out, schema_in, client_state_fields, client_to_server_includes
         )
+        setattr(cls, "__hyperpony_client_state_config", config)
 
-        return view_class
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for k, v in self._hyperpony_client_state_config().client_state_fields.items():
-            setattr(self, k, v.default)
-
-    @classmethod
-    def _hyperpony_client_state_config(cls) -> ClientStateViewConfig:
-        return getattr(cls, "__hyperpony_client_state_config")
+        return config
 
     def setup(self, request, *args, **kwargs):
-        super().setup(request, *args, **kwargs)
+        client_state_config = self.__process_hyperpony_client_states()
+        for k, v in client_state_config.client_state_fields.items():
+            setattr(self, k, v.default)
 
         if getattr(request, "htmx", False) and not hasattr(request, "_hyperpony_client_state"):
             setattr(request, "_hyperpony_client_state", _extract_client_states(request))
@@ -111,11 +100,15 @@ class ClientStateMixin(ElementAttrsMixin, ElementIdMixin, ContextMixin, View):
         if client_state := getattr(request, "_hyperpony_client_state", None):
             if client_state_element := client_state.get(self.get_element_id(), None):
                 self.is_client_state_present = True
-                config = self._hyperpony_client_state_config()
-                model = config.schema_in.model_validate_json(client_state_element)
+                model = client_state_config.schema_in.model_validate_json(client_state_element)
                 data = model.model_dump()
                 for k, v in data.items():
                     setattr(self, k, v)
+
+        super().setup(request, *args, **kwargs)  # type: ignore
+
+    def _hyperpony_client_state_config(self) -> ClientStateViewConfig:
+        return getattr(self.__class__, "__hyperpony_client_state_config")
 
     def get_context_data(self, **kwargs):
         kwargs.setdefault("client_state_attrs", self.get_client_state_attrs())

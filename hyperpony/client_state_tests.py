@@ -2,12 +2,13 @@ import lxml.html
 import orjson
 from django.http import HttpResponse
 from django.test import RequestFactory
+from django.views import View
 
 from hyperpony.client_state import ClientStateMixin, client_state
 from hyperpony.utils import response_to_str
 
 
-class V(ClientStateMixin):
+class V(ClientStateMixin, View):
     foo: str = client_state("foo", client_to_server=True)
     bar: int = client_state(123, client_to_server=True)
     baz: str = client_state("baz")
@@ -18,6 +19,7 @@ class V(ClientStateMixin):
         <div {self.get_client_state_attrs()}>
             foo={self.foo}
             bar={self.bar}
+            baz={self.baz}
         </div>
         """
         )
@@ -29,10 +31,10 @@ class V(ClientStateMixin):
 
 
 def test_client_state_default_values_are_set_in_instance(rf: RequestFactory):
-    view = V()
-    assert view.foo == "foo"
-    assert view.bar == 123
-    assert view.baz == "baz"
+    res = response_to_str(V.as_view()(rf.get("/")))
+    assert "foo=foo" in res
+    assert "bar=123" in res
+    assert "baz=baz" in res
 
 
 def test_server_to_client(rf: RequestFactory):

@@ -1,16 +1,16 @@
-import json
+import uuid
 from typing import cast
 
 import pytest
 from django.http import HttpResponse
 from django.test import RequestFactory
-from django.urls import path, re_path
+from django.urls import path
 from django.views import View
 
 from hyperpony import ViewUtilsMixin, SingletonPathMixin
 from hyperpony.testutils import view_from_response
 from hyperpony.utils import response_to_str, text_response_to_str_or_none
-from hyperpony.views import invoke_view, is_embedded_request, EmbeddedRequest
+from hyperpony.views import invoke_view, is_embedded_request, EmbeddedRequest, is_get
 from main.models import AppUser
 
 
@@ -21,9 +21,14 @@ from main.models import AppUser
 
 class TView(ViewUtilsMixin, View):
     def dispatch(self, request, *args, **kwargs):
-        res = HttpResponse(json.dumps({"args": self.args, "kwargs": self.kwargs}))
+        res = HttpResponse("")
         res.view = self
         return res
+
+
+class TViewKwargs(TView):
+    foo: str
+    bar: int
 
 
 class TViewSingleton(SingletonPathMixin, TView):
@@ -52,7 +57,8 @@ class TViewSingletonWithCustomName(TViewSingleton):
 
 urlpatterns = [
     path("view1/", TView.as_view(), name="view1"),
-    re_path("view1/<param1>", TView.as_view(), name="view1_param"),
+    path("viewkwargs/", TViewKwargs.as_view(), name="view_kwargs"),
+    path("view1/<param1>", TView.as_view(), name="view-param1"),
     TViewSingleton.create_path(),
     TViewSingletonPathStart.create_path(full_path="full_path"),
     TViewSingletonPathEnd.create_path("path_suffix"),
@@ -118,15 +124,7 @@ def test_viewutil_is_embedded_request(rf: RequestFactory):
 @pytest.mark.urls("hyperpony.views_tests")
 def test_embedded_view_request_is_always_get(rf: RequestFactory):
     view = view_from_response(TView, invoke_view(rf.post("/"), "view1"))
-    assert view.is_get()
-
-
-def test_viewutils_http_methods(rf: RequestFactory):
-    assert view_from_response(TView, TView.as_view()(rf.get("/"))).is_get()
-    assert view_from_response(TView, TView.as_view()(rf.post("/"))).is_post()
-    assert view_from_response(TView, TView.as_view()(rf.put("/"))).is_put()
-    assert view_from_response(TView, TView.as_view()(rf.patch("/"))).is_patch()
-    assert view_from_response(TView, TView.as_view()(rf.delete("/"))).is_delete()
+    assert is_get(view.request)
 
 
 # #######################################################################
@@ -145,14 +143,9 @@ def test_singleton_path_mixin(rf: RequestFactory):
     # invoke
     data = view_from_response(
         TViewSingletonPathStartPathEnd,
-        TViewSingletonPathStartPathEnd.invoke(rf.get("/"), None, None, "foo1"),
+        TViewSingletonPathStartPathEnd.invoke(rf.get("/"), args=["foo1"]),
     )
     assert data.kwargs == {"param1": "foo1"}
-
-    # embed
-    content = TViewSingletonPathStartPathEnd.embed(rf.get("/"), None, None, "foo2")
-    data = json.loads(content)
-    assert data["kwargs"] == {"param1": "foo2"}
 
 
 # #######################################################################
@@ -162,24 +155,44 @@ def test_singleton_path_mixin(rf: RequestFactory):
 
 @pytest.mark.urls("hyperpony.views_tests")
 def test_viewutils_url(rf: RequestFactory):
-    assert view_from_response(ViewUtilsMixin, invoke_view(rf.post("/"), "view1")).url() == "/view1/"
+    assert view_from_response(ViewUtilsMixin, invoke_view(rf.post("/"), "view1")).path == "/view1/"
 
     res = invoke_view(rf.get("/"), cast(str, TViewSingleton.get_path_name()))
-    assert view_from_response(ViewUtilsMixin, res).url() == "/TViewSingleton"
+    assert view_from_response(ViewUtilsMixin, res).path == "/TViewSingleton"
 
     res = invoke_view(rf.get("/"), cast(str, TViewSingletonPathStart.get_path_name()))
-    assert view_from_response(ViewUtilsMixin, res).url() == "/full_path"
+    assert view_from_response(ViewUtilsMixin, res).path == "/full_path"
 
     res = invoke_view(rf.get("/"), cast(str, TViewSingletonPathEnd.get_path_name()))
-    assert view_from_response(ViewUtilsMixin, res).url() == "/TViewSingletonPathEnd/path_suffix"
+    assert view_from_response(ViewUtilsMixin, res).path == "/TViewSingletonPathEnd/path_suffix"
 
-    pn = cast(str, TViewSingletonPathEndParam.get_path_name())
-    res = invoke_view(rf.get("/"), pn, kwargs={"param1": "foo"})
-    assert view_from_response(ViewUtilsMixin, res).url() == "/TViewSingletonPathEndParam/foo"
+    path_name = cast(str, TViewSingletonPathEndParam.get_path_name())
+    res = invoke_view(rf.get("/"), path_name, kwargs=dict(param1="foo"))
+    assert view_from_response(ViewUtilsMixin, res).path == "/TViewSingletonPathEndParam/foo"
 
-    pn = cast(str, TViewSingletonPathStartPathEnd.get_path_name())
-    res = invoke_view(rf.get("/"), pn, kwargs={"param1": "foo"})
-    assert view_from_response(ViewUtilsMixin, res).url() == "/full_path/foo"
+    path_name = cast(str, TViewSingletonPathStartPathEnd.get_path_name())
+    res = invoke_view(rf.get("/"), path_name, kwargs=dict(param1="foo"))
+    assert view_from_response(ViewUtilsMixin, res).path == "/full_path/foo"
 
     res = invoke_view(rf.get("/"), "custom_name")
-    assert view_from_response(ViewUtilsMixin, res).url() == "/TViewSingletonWithCustomName"
+    assert view_from_response(ViewUtilsMixin, res).path == "/TViewSingletonWithCustomName"
+
+
+@pytest.mark.urls("hyperpony.views_tests")
+@pytest.mark.django_db
+def test_viewutils_params(rf: RequestFactory):
+    r = rf.get("/")
+    view = view_from_response(TView, invoke_view(r, "view-param1", kwargs=dict(param1="foo")))
+    assert view.kwargs == {"param1": "foo"}
+    view = view_from_response(TView, invoke_view(r, "view-param1", args=["foo"]))
+    assert view.kwargs == {"param1": "foo"}
+    view = view_from_response(TView, invoke_view(r, "view-param1", kwargs=dict(param1=1)))
+    assert view.kwargs == {"param1": "1"}
+
+    u = uuid.uuid4()
+    view = view_from_response(TView, invoke_view(r, "view-param1", kwargs=dict(param1=u)))
+    assert view.kwargs == {"param1": str(u)}
+
+    app_user = AppUser.objects.create(username="testuser")
+    view = view_from_response(TView, invoke_view(r, "view-param1", kwargs=dict(param1=app_user)))
+    assert view.kwargs == {"param1": str(app_user.id)}

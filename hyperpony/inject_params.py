@@ -1,6 +1,5 @@
 import dataclasses
 import inspect
-import typing
 import uuid
 from dataclasses import dataclass
 from types import UnionType
@@ -12,6 +11,11 @@ from typing import (
     Optional,
     Type,
     TypeVar,
+    get_type_hints,
+    Literal,
+    Iterable,
+    Callable,
+    Union,
 )
 
 import orjson
@@ -20,6 +24,7 @@ from django.db import models
 from django.http import HttpRequest, HttpResponse, QueryDict
 
 from hyperpony.utils import _get_request_from_args, is_none_compatible
+from hyperpony.views import EmbeddedRequest
 
 
 # @deprecated("use CBV")
@@ -110,7 +115,7 @@ class InjectParamsMixin:
         if hasattr(cls, "__hyperpony_params"):
             return getattr(cls, "__hyperpony_params")
 
-        ths = typing.get_type_hints(cls)
+        ths = get_type_hints(cls)
         params: dict[str, QueryParam] = {}
         for member_name, ip in inspect.getmembers(cls):
             if isinstance(ip, QueryParam):
@@ -126,23 +131,19 @@ class InjectParamsMixin:
         setattr(cls, "__hyperpony_params", params)
         return params
 
-    # @classmethod
-    # def _hyperpony_params(cls) -> dict[str, "QueryParam"]:
-    #     return getattr(cls, "__hyperpony_params")
-
     def setup(self, request, *args, **kwargs):
         hyperpony_params = self.__process_hyperpony_params()
-
-        for k, v in kwargs.items():
-            if qp := hyperpony_params.get(k, None):
-                qp.default = v
-
         for k, v in hyperpony_params.items():
             # do not process QueryParam if view instance overrides field
             if hasattr(self, k) and not isinstance(getattr(self, k), QueryParam):
                 continue
 
-            value = v.get_value([request], kwargs)
+            try:
+                value = v.get_value([request], kwargs)
+            except KeyError:
+                raise Exception(
+                    f"No value found for non-optional parameter '{self.__class__.__name__}.{v.query_param_name}'"
+                )
             setattr(self, k, value)
 
         return super().setup(request, *args, **kwargs)  # type: ignore
@@ -216,11 +217,12 @@ class QueryParam(InjectedParam):
     query_param_name: Optional[str] = dataclasses.field(default=None)
     default: Any = dataclasses.field(default=None)
     # ignore_view_stack: bool = dataclasses.field(default=False)
-    origins: typing.Iterable[
-        typing.Literal["GET", "POST", "PUT", "DELETE", "PATCH", "PATH", "KWARGS", "__all__"]
+    origins: Iterable[
+        Literal["GET", "POST", "PUT", "DELETE", "PATCH", "PATH", "KWARGS", "__all__"]
     ] = dataclasses.field(default=("GET",))
     parse_content_type_form_urlencoded: bool = dataclasses.field(default=True)
     parse_content_type_json: bool = dataclasses.field(default=True)
+    model_loader: Callable[[Any], Any] | None = dataclasses.field(default=None)
 
     def __post_init__(self):
         if "__all__" in self.origins:
@@ -263,6 +265,9 @@ class QueryParam(InjectedParam):
             # noinspection PyTypeChecker
             source.update({k: [v] for k, v in kwargs.items()})
 
+        if isinstance(request, EmbeddedRequest):
+            source.update({k: [v] for k, v in request.hyperpony_params_bypass_values.items()})
+
         return source
 
     def get_value(self, args: Any, kwargs: dict[str, Any]):
@@ -274,17 +279,16 @@ class QueryParam(InjectedParam):
         # else:
         #     values = None
 
+        is_optional = is_none_compatible(self.target_type)
         if values is None:
-            if is_none_compatible(self.target_type):
+            if is_optional:
                 return None
             if self.default is not _REQUIRED:
                 values = [self.default]
             else:
-                raise Exception(
-                    f"No value found for non-optional request parameter '{self.query_param_name}'"
-                )
+                raise KeyError()
 
-        return _convert_value_to_type(values, self.target_type)
+        return _convert_value_to_type(self, values, self.target_type, is_optional)
 
 
 T = TypeVar("T")
@@ -295,12 +299,13 @@ _REQUIRED = object()
 def param(
     default: T = cast(Any, _REQUIRED),
     *,
-    origins: typing.Iterable[
-        typing.Literal["GET", "POST", "PUT", "DELETE", "PATCH", "PATH", "__all__"]
+    origins: Iterable[
+        Literal["GET", "POST", "PUT", "DELETE", "PATCH", "PATH", "KWARGS", "__all__"]
     ] = ("__all__",),
     parse_content_type_form_urlencoded=True,
     parse_content_type_json=True,
     # ignore_view_stack=False,
+    model_loader: Callable[[Any], Any] | None = None,
 ) -> T:
     return cast(
         T,
@@ -310,12 +315,13 @@ def param(
             origins=origins,
             parse_content_type_form_urlencoded=parse_content_type_form_urlencoded,
             parse_content_type_json=parse_content_type_json,
+            model_loader=model_loader,
         ),
     )
 
 
 def check_and_return_model_type(target_type: Any) -> Type[models.Model] | None:
-    if get_origin(target_type) is typing.Union or isinstance(target_type, UnionType):
+    if get_origin(target_type) is Union or isinstance(target_type, UnionType):
         # union type
         for t in get_args(target_type):
             if issubclass(t, models.Model):
@@ -335,14 +341,14 @@ class ObjectDoesNotExistWithPk(ObjectDoesNotExist):
         self.pk = pk
 
 
-def _convert_value_to_type(values: list[Any], target_type: type):
+def _convert_value_to_type(qp: QueryParam, values: list[Any], target_type: type, is_optional: bool):
     # List type
     if get_origin(target_type) is list:
         list_type = get_args(target_type)[0]
-        return [_convert_value_to_type([v], list_type) for v in values]
+        return [_convert_value_to_type(qp, [v], list_type, is_optional) for v in values]
 
     if target_type is list:
-        return [_convert_value_to_type([v], str) for v in values]
+        return [_convert_value_to_type(qp, [v], str, is_optional) for v in values]
 
     # Scalar types
     value = values[0]
@@ -351,9 +357,15 @@ def _convert_value_to_type(values: list[Any], target_type: type):
         if value is None:
             pass  # trigger ValueError
         elif model_type := check_and_return_model_type(target_type):
+            if isinstance(value, model_type):
+                return value
             try:
+                if qp.model_loader is not None:
+                    return qp.model_loader(value)
                 return model_type.objects.get(pk=value)
             except model_type.DoesNotExist as e:
+                if is_optional:
+                    return None
                 if issubclass(ObjectDoesNotExistWithPk, target_type):
                     raise ObjectDoesNotExistWithPk(value)
                 raise e

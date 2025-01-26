@@ -13,9 +13,9 @@
 
     <div x-text="test()"></div>
 
-    <div x-text="client_state.foo"></div>
-    <div x-text="client_state.bar"></div>
-    <input x-model="client_state.baz"></input>
+    <div>Foo: <div x-text="client_state.foo"></div></div>
+    <div>Bar: <input x-model="client_state.bar"></div>
+    <div>Baz: <input x-model="client_state.baz"></div>
     <hr>
 
     <div>
@@ -24,11 +24,11 @@
     </div>
 
     <div>
-        <button hx-get="{{ view.url }}">get</button>
-        <button hx-post="{{ view.url }}?met=post">post</button>
-        <button hx-put="{{ view.url }}">put</button>
-        <button hx-patch="{{ view.url }}">patch</button>
-        <button hx-delete="{{ view.url }}">delete</button>
+        <button hx-get="{{ view.path }}">get</button>
+        <button hx-post="{{ view.path }}?met=post">post</button>
+        <button hx-put="{{ view.path }}">put</button>
+        <button hx-patch="{{ view.path }}">patch</button>
+        <button hx-delete="{{ view.path }}">delete</button>
     </div>
 
     <hr>
