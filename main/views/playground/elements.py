@@ -1,25 +1,14 @@
 from datetime import datetime
 
-from django.http import HttpResponse, HttpRequest
 from django.urls import path
-from django.views import View
 from django.views.generic import TemplateView
-from htpy import br, render_node, h3, Node, button
+from htpy import br, h3, button
 from icecream import ic
 
 from hyperpony import SingletonPathMixin, HyperponyElementMixin, param, HyperponyMixin
 from hyperpony.htmx import swap_body
+from hyperpony.htpy import HtpyView
 from hyperpony.views import invoke_view
-
-
-class _HtpyView(View):
-    # noinspection PyUnusedLocal
-    def get(self, request, *args, **kwargs):
-        return HttpResponse(render_node(self.render(request, *args, **kwargs)))
-
-    # noinspection PyMethodMayBeStatic
-    def render(self, request: HttpRequest, *args, **kwargs) -> Node:
-        return None
 
 
 class Level1PageView(SingletonPathMixin, HyperponyMixin, TemplateView):
@@ -78,7 +67,7 @@ class Level3AElement(SingletonPathMixin, HyperponyElementMixin, TemplateView):
         }
 
 
-class Level3BElement(SingletonPathMixin, HyperponyElementMixin, _HtpyView):
+class Level3BElement(SingletonPathMixin, HyperponyElementMixin, HtpyView):
     element_id = "l3b"
     tag = "span"
     source = param("???")
