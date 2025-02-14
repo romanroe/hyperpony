@@ -4,13 +4,11 @@ from django.shortcuts import render
 from django.urls import path
 from django.views import View
 from htpy import div, h1, Node, form, button, input
-from icecream import ic
 from widget_tweaks.templatetags.widget_tweaks import add_class
 
 from hyperpony import HyperponyElementMixin, SingletonPathMixin, param
 from hyperpony.form import create_form, is_valid_submit
-from hyperpony.htpy import HtpyView, HtPyActionsMixin, hx_vals_kwargs
-from hyperpony.views import is_post, is_patch
+from hyperpony.htpy import HtpyView, HtPyActionsMixin, hx_vals
 from main.models import Todo
 
 
@@ -33,24 +31,16 @@ class TodoAppPage(View):
 
 class TodoListElement(HyperponyElementMixin, SingletonPathMixin, HtpyView):
     def render(self, request: HttpRequest, *args, **kwargs) -> Node:
-        return div("#todos")[
-            div("#todos-open")[
-                (
-                    TodoElement.embed(request, view_kwargs=dict(todo=t))
-                    for t in Todo.objects.filter(completed=False).order_by("title")
-                )
-            ],
-            div("#todos-done.text-secondary.fst-italic.text-decoration-line-through")[
-                (
-                    TodoElement.embed(request, view_kwargs=dict(todo=t))
-                    for t in Todo.objects.filter(completed=True).order_by("title")
-                )
-            ],
+        todos_open = Todo.objects.filter(completed=False).order_by("title")
+        todos_completed = Todo.objects.filter(completed=True).order_by("title")
+
+        return [
+            (TodoElement.embed(request, view_kwargs=dict(todo=t)) for t in todos_open),
+            (TodoElement.embed(request, view_kwargs=dict(todo=t)) for t in todos_completed),
         ]
 
 
 def _todo_loader(_, pk):
-    ic("loading", pk)
     return Todo() if pk == "new" else Todo.objects.get(pk=pk)
 
 
@@ -65,55 +55,44 @@ class TodoElement(HyperponyElementMixin, SingletonPathMixin, HtPyActionsMixin, H
     full_view = param(False)
     form: TodoForm
 
-    def dispatch(self, request: HttpRequest, *args, **kwargs):
+    def pre_dispatch(self, request: HttpRequest, *args, **kwargs):
         self.element_id = f"todo{self.todo.pk}"
+        if self.full_view:
+            self.enable_preserve_on_outer_swap()
 
         self.form = create_form(request, TodoForm, instance=self.todo)
-        was_completed = self.todo.completed
-        response = super().dispatch(request, *args, **kwargs)
 
-        # if not was_completed and self.todo.completed:
-        #     self.add_swap_oob(response, "afterbegin:#todos-done")
-        #     return ElementResponse.empty()
-        # if was_completed and not self.todo.completed:
-        #     self.add_swap_oob(response, "beforeend:#todos-open")
-        #     return ElementResponse.empty()
-
-        if is_post(request) or is_patch(request):
-            # response = retarget(TodoListElement.invoke(request), "#TodoListElement")
-            # self.attrs["hp-keep"] = "close"
-            TodoListElement.swap_oob(request)
-
-        return response
-
-    def action_toggle(self):
+    def action_toggle(self, value: bool):
         self.todo.completed = not self.todo.completed
         self.todo.save()
+        TodoListElement.swap_oob(self.request)
 
     def post(self, request, *args, **kwargs):
         if is_valid_submit(request, self.form):
+            TodoListElement.swap_oob(request)
             self.form.save()
 
         return self.get(request, *args, **kwargs)
 
     def render(self, request: HttpRequest, *args, **kwargs) -> Node:
         if not self.full_view:
-            print("render todo", self.todo.id)
             return div(".my-3.d-flex.align-items-center")[
                 input(
                     ".form-check-input.me-2",
+                    self.create_action("toggle", value=(not self.todo.completed)),
                     type="checkbox",
                     checked=self.todo.completed,
                     hx_trigger="input",
-                    **self.action_kwargs("toggle"),
                 ),
                 div(
+                    hx_vals(full_view=True),
                     hx_get=self.path,
-                    **hx_vals_kwargs(full_view=True),
+                    class_={
+                        "text-secondary fst-italic text-decoration-line-through": self.todo.completed
+                    },
                 )[self.todo.title],
             ]
 
-        self.enable_preserve_on_outer_swap()
         return div(".p-3.border.rounded.shadow")[
             form(hx_post=self.path)[
                 div(".d-flex.align-items-center")[

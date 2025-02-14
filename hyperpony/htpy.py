@@ -1,6 +1,6 @@
 import inspect
 import json
-from typing import ClassVar
+from typing import ClassVar, Any
 
 from django.http import HttpRequest, HttpResponse, QueryDict
 from django.views import View
@@ -42,7 +42,7 @@ class HtPyActionsMixin:
 
         return method
 
-    def action_kwargs(self, name: str, **kwargs):
+    def create_action(self, name: str, **kwargs):
         """
         Validates and prepares parameters for an action method call.
 
@@ -76,10 +76,8 @@ class HtPyActionsMixin:
                 )
 
         return {
-            "hx_patch": self.path,  # type: ignore
-            **hx_vals_kwargs(
-                __hp_action=name, **{f"__hp_action_param_{k}": v for k, v in kwargs.items()}
-            ),
+            "hx-patch": self.path,  # type: ignore
+            **hx_vals(__hp_action=name, **{f"__hp_action_param_{k}": v for k, v in kwargs.items()}),
         }
 
     def patch(self, request: HttpRequest, *args, **kwargs):
@@ -98,5 +96,5 @@ class HtPyActionsMixin:
         return self.get(request, *args, **kwargs)  # type: ignore
 
 
-def hx_vals_kwargs(**kwargs) -> dict[str, str]:
-    return {"hx_vals": json.dumps({str(k): v for k, v in kwargs.items()})}
+def hx_vals(**kwargs) -> dict[str, Any]:
+    return {"hx-vals": json.dumps({str(k): v for k, v in kwargs.items()})}

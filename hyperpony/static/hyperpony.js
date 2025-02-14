@@ -33,27 +33,26 @@ document.body.addEventListener("fetch:beforeRequest", addCsrfTokenHeader);
 let requests = new Map()
 
 function beforeSwap(event) {
-    console.log("-----------------------------");
-    console.log(event.type);
-
+    // console.log(event.type);
     let target = event.detail.target;
-
-    let keeps = Array.from(target.querySelectorAll("[hp-keep=open]"));
-    console.log("keeps", keeps);
+    let keeps = Array.from(target.querySelectorAll("[hp-preserve-on-outer-swap=enable]"));
+    // console.log("keeps", keeps);
     requests.set(event.detail.xhr, keeps);
 }
 
 function afterSwap(event) {
-    console.log("-----------------------------");
-    console.log(event.type);
-
+    // console.log(event.type);
     let keeps = requests.get(event.detail.xhr);
     if (keeps) {
         let swappedIn = event.detail.elt;
         for (let p of keeps) {
             let toReplace = swappedIn.querySelector("[id=" + p.id + "]");
             if (toReplace) {
-                // console.log("replacing", toReplace.outerHTML, "\n__WITH__\n", p.outerHTML);
+                let hpAttr = toReplace.attributes["hp-preserve-on-outer-swap"];
+                if (hpAttr && hpAttr.value === "close") {
+                    continue;
+                }
+                // console.log("replacing", toReplace, "\n__WITH__\n", p);
                 toReplace.after(p);
                 toReplace.remove();
             }

@@ -67,13 +67,15 @@ class ElementMixin(ElementAttrsMixin, ElementIdMixin):
     attrs: dict[str, str]
     nowrap: bool = False
 
+    def _init_attrs(self):
+        if not hasattr(self, "attrs"):
+            self.attrs = {}
+
     def get_attrs(self) -> dict[str, str]:
         return {**super().get_attrs(), **self.attrs}
 
     def dispatch(self, request, *args, **kwargs):
-        if not hasattr(self, "attrs"):
-            self.attrs = {}
-
+        self._init_attrs()
         response = super().dispatch(request, *args, **kwargs)  # type: ignore
         return ElementResponse.wrap(
             response,
@@ -87,4 +89,9 @@ class ElementMixin(ElementAttrsMixin, ElementIdMixin):
         )
 
     def enable_preserve_on_outer_swap(self):
-        self.attrs["hp-keep"] = "open"
+        self._init_attrs()
+        self.attrs["hp-preserve-on-outer-swap"] = "enable"
+
+    def disable_preserve_on_outer_swap(self):
+        self._init_attrs()
+        self.attrs["hp-preserve-on-outer-swap"] = "disable"
