@@ -62,7 +62,7 @@ class TViewModelRouteParam(InjectParamsMixin, View):
 
 
 class TViewModelLoaderFn(InjectParamsMixin, ViewWithSelfInResponse):
-    p1: AppUser = param(model_loader=lambda v: AppUser(id=v, username=f"created_{v}"))
+    p1: AppUser = param(model_loader=lambda r, v: AppUser.objects.get(pk=v))
 
 
 urlpatterns = [
@@ -75,6 +75,11 @@ urlpatterns = [
         name="tview-model-route-param",
     ),
     path("tview_model_loader_fn/", TViewModelLoaderFn.as_view(), name="tview-model-loader-fn"),
+    path(
+        "tview_model_loader_fn_pk_route_param/<uuid:p1>",
+        TViewModelLoaderFn.as_view(),
+        name="tview-model-loader-fn-pk-route-param",
+    ),
 ]
 
 
@@ -412,29 +417,61 @@ def test_inject_params_type_conversion_model_with_instance_as_route_param(
 
 @pytest.mark.django_db
 @pytest.mark.urls("hyperpony.inject_params_tests")
-def test_inject_params_type_conversion_model_provide_instance_with_view_kwargs(
-    rf: RequestFactory, mocker: MockerFixture
-):
-    app_user = AppUser.objects.create(username="testuser")
-    spy = mocker.spy(AppUser.objects, "get")
-    content = embed_view(
-        rf.get("/"),
-        "tview-model-route-param",
-        kwargs=dict(user=uuid4()),
-        view_kwargs=dict(user=app_user),
+def test_inject_params_type_conversion_model_loader_fn(rf: RequestFactory):
+    au = AppUser.objects.create(username="testuser")
+    view = view_from_response(
+        TViewModelLoaderFn, invoke_view(rf.get("/"), "tview-model-loader-fn", GET=dict(p1=au.pk))
     )
-    assert f"{app_user.id} {app_user.username}" in content
-    assert spy.call_count == 0
+    assert view.p1.id == au.pk
+    assert view.p1.username == "testuser"
 
 
 @pytest.mark.django_db
 @pytest.mark.urls("hyperpony.inject_params_tests")
-def test_inject_params_type_conversion_model_loader_fn(rf: RequestFactory):
+def test_inject_params_type_conversion_model_loader_fn_not_called_when_passing_model_instance_as_view_kwargs(
+    rf: RequestFactory, mocker: MockerFixture
+):
+    au = AppUser.objects.create(username="testuser")
+    spy = mocker.spy(AppUser.objects, "get")
+
+    # pass PK, but check that it is not used
     view = view_from_response(
-        TViewModelLoaderFn, invoke_view(rf.get("/"), "tview-model-loader-fn", GET=dict(p1=1))
+        TViewModelLoaderFn,
+        invoke_view(
+            rf.get("/"), "tview-model-loader-fn", GET=dict(p1=au.pk), view_kwargs=dict(p1=au)
+        ),
     )
-    assert view.p1.id == 1
-    assert view.p1.username == "created_1"
+    assert spy.call_count == 0
+    assert view.p1 is au
+
+    # only pass instance
+    view = view_from_response(
+        TViewModelLoaderFn,
+        invoke_view(rf.get("/"), "tview-model-loader-fn", view_kwargs=dict(p1=au)),
+    )
+    assert view.p1 is au
+
+
+@pytest.mark.django_db
+@pytest.mark.urls("hyperpony.inject_params_tests")
+def test_inject_params_type_conversion_model_loader_fn_route_param_not_called_when_passing_model_instance_as_view_kwargs(
+    rf: RequestFactory, mocker: MockerFixture
+):
+    au = AppUser.objects.create(username="testuser")
+    spy = mocker.spy(AppUser.objects, "get")
+
+    # pass PK for route creation, but check that it is not used
+    view = view_from_response(
+        TViewModelLoaderFn,
+        invoke_view(
+            rf.get("/"),
+            "tview-model-loader-fn-pk-route-param",
+            kwargs=dict(p1=au.pk),
+            view_kwargs=dict(p1=au),
+        ),
+    )
+    assert spy.call_count == 0
+    assert view.p1 is au
 
 
 @pytest.mark.django_db

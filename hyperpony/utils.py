@@ -1,6 +1,7 @@
 from types import UnionType
 from typing import Any, TypeVar, Callable, get_origin, Union, get_args, Optional
-
+import lxml.html
+from lxml.html import Element
 from django.http import HttpRequest, HttpResponse, HttpResponseBase
 from django.template.response import TemplateResponse
 from django.utils.safestring import mark_safe, SafeString
@@ -58,3 +59,11 @@ def is_none_compatible(type_hint):
         return True
 
     return False
+
+
+def parse_html(html: str) -> Element:
+    return lxml.html.fromstring(html)
+
+
+def lxml_to_str(element: Element) -> str:
+    return lxml.html.tostring(element)

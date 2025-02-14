@@ -222,7 +222,7 @@ class QueryParam(InjectedParam):
     ] = dataclasses.field(default=("GET",))
     parse_content_type_form_urlencoded: bool = dataclasses.field(default=True)
     parse_content_type_json: bool = dataclasses.field(default=True)
-    model_loader: Callable[[Any], Any] | None = dataclasses.field(default=None)
+    model_loader: Callable[[HttpRequest, Any], Any] | None = dataclasses.field(default=None)
 
     def __post_init__(self):
         if "__all__" in self.origins:
@@ -288,7 +288,7 @@ class QueryParam(InjectedParam):
             else:
                 raise KeyError()
 
-        return _convert_value_to_type(self, values, self.target_type, is_optional)
+        return _convert_value_to_type(request, self, values, self.target_type, is_optional)
 
 
 T = TypeVar("T")
@@ -299,17 +299,19 @@ _REQUIRED = object()
 def param(
     default: T = cast(Any, _REQUIRED),
     *,
+    name: str | None = None,
     origins: Iterable[
         Literal["GET", "POST", "PUT", "DELETE", "PATCH", "PATH", "KWARGS", "__all__"]
     ] = ("__all__",),
     parse_content_type_form_urlencoded=True,
     parse_content_type_json=True,
     # ignore_view_stack=False,
-    model_loader: Callable[[Any], Any] | None = None,
+    model_loader: Callable[[HttpRequest, Any], Any] | None = None,
 ) -> T:
     return cast(
         T,
         QueryParam(
+            query_param_name=name,
             default=default,
             # ignore_view_stack=ignore_view_stack,
             origins=origins,
@@ -341,14 +343,16 @@ class ObjectDoesNotExistWithPk(ObjectDoesNotExist):
         self.pk = pk
 
 
-def _convert_value_to_type(qp: QueryParam, values: list[Any], target_type: type, is_optional: bool):
+def _convert_value_to_type(
+    request: HttpRequest, qp: QueryParam, values: list[Any], target_type: type, is_optional: bool
+):
     # List type
     if get_origin(target_type) is list:
         list_type = get_args(target_type)[0]
-        return [_convert_value_to_type(qp, [v], list_type, is_optional) for v in values]
+        return [_convert_value_to_type(request, qp, [v], list_type, is_optional) for v in values]
 
     if target_type is list:
-        return [_convert_value_to_type(qp, [v], str, is_optional) for v in values]
+        return [_convert_value_to_type(request, qp, [v], str, is_optional) for v in values]
 
     # Scalar types
     value = values[0]
@@ -361,7 +365,7 @@ def _convert_value_to_type(qp: QueryParam, values: list[Any], target_type: type,
                 return value
             try:
                 if qp.model_loader is not None:
-                    return qp.model_loader(value)
+                    return qp.model_loader(request, value)
                 return model_type.objects.get(pk=value)
             except model_type.DoesNotExist as e:
                 if is_optional:

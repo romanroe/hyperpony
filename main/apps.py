@@ -7,5 +7,6 @@ class MainConfig(AppConfig):
     name = "main"
 
     def ready(self):
-        # logger.info("--- Django started ---")
-        pass
+        from icecream import ic
+
+        ic.configureOutput(includeContext=True)

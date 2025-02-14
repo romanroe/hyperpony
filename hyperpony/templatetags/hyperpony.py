@@ -19,14 +19,6 @@ def hyperpony_script():
 
 
 @register.simple_tag
-def hyperpony_client_state():
-    return format_html(
-        '<script type="text/javascript" defer src="{}"></script>',
-        static("../static/hyperpony_client_state.js"),
-    )
-
-
-@register.simple_tag
 def hyperpony_script_swap_merge():
     return format_html(
         '<script type="text/javascript" defer src="{}"></script>',

@@ -1,9 +1,9 @@
 from io import BytesIO
-from typing import cast, Optional, Union, Any
+from typing import cast, Optional, Union, Any, Callable
 
 from django.db.models import Model
 from django.http import HttpRequest, HttpResponse, QueryDict
-from django.urls import path, reverse, ResolverMatch, resolve
+from django.urls import path, reverse, ResolverMatch, resolve, get_urlconf, get_resolver
 
 from hyperpony.htmx import swap_oob
 from hyperpony.response_handler import RESPONSE_HANDLER, add_response_handler
@@ -119,7 +119,7 @@ class ViewUtilsMixin:
 
 def invoke_view(
     request: HttpRequest,
-    path_name: str,
+    path_name: str | Callable,
     *,
     GET: Union[QueryDict, dict, None] = None,  # noqa: N803
     POST: Union[QueryDict, dict, None] = None,  # noqa: N803
@@ -141,6 +141,16 @@ def invoke_view(
         post_qd = POST
 
     embedded_req = EmbeddedRequest.create(request, get_qd, post_qd)
+
+    # enrich missing kwargs with view_kwargs
+    urlconf = get_urlconf()
+    resolver = get_resolver(urlconf)
+    if entry := resolver.reverse_dict.get(path_name):
+        _, _, _, params = entry
+        for k in params.keys():
+            if (kwargs is None or k not in kwargs) and view_kwargs and k in view_kwargs:
+                kwargs = kwargs if kwargs else {}
+                kwargs[k] = view_kwargs[k]
 
     reverse_args = [_cleanup_value_path_reverse(a) for a in args] if args is not None else None
     reverse_kwargs = (
@@ -179,7 +189,7 @@ def _cleanup_value_path_reverse(value):
 # noinspection PyPep8Naming
 def embed_view(
     request: HttpRequest,
-    path_name: str,
+    path_name: str | Callable,
     *,
     GET: Union[QueryDict, dict, None] = None,  # noqa: N803
     POST: Union[QueryDict, dict, None] = None,  # noqa: N803
@@ -212,7 +222,7 @@ class SingletonPathMixin:
         full_path: Optional[str] = None,
         name: Optional[str] = None,
     ):
-        if cls.get_path_name() is not None:
+        if "__viewname" in cls.__dict__:
             raise Exception("create_path() can only be called once per view class.")
         if full_path is not None and path_suffix is not None:
             raise Exception("Either full_path or path_suffix can be specified, not both.")
@@ -226,13 +236,31 @@ class SingletonPathMixin:
         path_name = (
             name if name is not None else f"{cls.__module__}.{cls.__name__}".replace(".", "-")
         )
-        setattr(cls, "__path_name", path_name)
+        setattr(cls, "__viewname", path_name)
 
         return path(full_path, cast(Any, cls).as_view(), name=path_name)
 
     @classmethod
-    def get_path_name(cls) -> Optional[str]:
-        return cls.__dict__.get("__path_name", None)
+    def get_viewname(cls) -> str | Callable:
+        if "__viewname" in cls.__dict__:
+            return cls.__dict__["__viewname"]
+
+        urlconf = get_urlconf()
+        resolver = get_resolver(urlconf)
+        matches = [
+            k
+            for k in resolver.reverse_dict.keys()
+            if hasattr(k, "view_class") and k.view_class is cls
+        ]
+        if len(matches) == 0:
+            raise Exception(f"View {cls} is not registered.")
+        if len(matches) > 1:
+            raise Exception(f"View {cls} is registered multiple times!")
+
+        viewname = matches[0]
+        setattr(cls, "__viewname", viewname)
+
+        return viewname
 
     # noinspection PyPep8Naming
     @classmethod
@@ -246,7 +274,7 @@ class SingletonPathMixin:
         kwargs: dict | None = None,
         view_kwargs: dict | None = None,
     ):
-        path_name = cls.get_path_name()
+        path_name = cls.get_viewname()
         if path_name is None:
             raise Exception(f"View {cls} was not registered with create_path().")
         return invoke_view(
@@ -271,17 +299,22 @@ class SingletonPathMixin:
         kwargs: dict | None = None,
         view_kwargs: dict | None = None,
     ):
-        path_name = cls.get_path_name()
-        if path_name is None:
-            raise Exception(f"View {cls} was not registered with create_path().")
-        return embed_view(
-            request,
-            path_name,
-            GET=GET,
-            POST=POST,
-            args=args,
-            kwargs=kwargs,
-            view_kwargs=view_kwargs,
+        # path_name = cls.get_viewname()
+        # if path_name is None:
+        #     raise Exception(f"View {cls} was not registered with create_path().")
+        # return embed_view(
+        #     request,
+        #     path_name,
+        #     GET=GET,
+        #     POST=POST,
+        #     args=args,
+        #     kwargs=kwargs,
+        #     view_kwargs=view_kwargs,
+        # )
+        return response_to_str(
+            cls.invoke(
+                request, GET=GET, POST=POST, args=args, kwargs=kwargs, view_kwargs=view_kwargs
+            )
         )
 
     # noinspection PyPep8Naming
@@ -308,7 +341,7 @@ class SingletonPathMixin:
     @classmethod
     def reverse(cls, *, urlconf=None, args=None, kwargs=None, current_app=None):
         return reverse(
-            cls.get_path_name(), urlconf=urlconf, args=args, kwargs=kwargs, current_app=current_app
+            cls.get_viewname(), urlconf=urlconf, args=args, kwargs=kwargs, current_app=current_app
         )
 
 

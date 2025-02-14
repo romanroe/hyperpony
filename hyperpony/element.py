@@ -64,13 +64,16 @@ class ElementMixin(ElementAttrsMixin, ElementIdMixin):
     tag: str = "div"
     hx_target: str = "this"
     hx_swap: str = "outerHTML"
-    attrs: Optional[dict[str, str]] = None
+    attrs: dict[str, str]
     nowrap: bool = False
 
     def get_attrs(self) -> dict[str, str]:
-        return {**super().get_attrs(), **(self.attrs or {})}
+        return {**super().get_attrs(), **self.attrs}
 
     def dispatch(self, request, *args, **kwargs):
+        if not hasattr(self, "attrs"):
+            self.attrs = {}
+
         response = super().dispatch(request, *args, **kwargs)  # type: ignore
         return ElementResponse.wrap(
             response,
@@ -82,3 +85,6 @@ class ElementMixin(ElementAttrsMixin, ElementIdMixin):
                 attrs=self.get_attrs(),
             ),
         )
+
+    def enable_preserve_on_outer_swap(self):
+        self.attrs["hp-keep"] = "open"
