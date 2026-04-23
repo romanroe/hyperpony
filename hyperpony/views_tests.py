@@ -2,14 +2,14 @@ import uuid
 from typing import cast
 
 import pytest
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from django.test import RequestFactory
 from django.urls import path
 from django.views import View
 
 from hyperpony import ViewUtilsMixin, SingletonPathMixin
 from hyperpony.testutils import view_from_response
-from hyperpony.utils import response_to_str, text_response_to_str_or_none
+from hyperpony.utils import response_to_str, text_response_to_str_or_none, is_response_processable
 from hyperpony.views import invoke_view, is_embedded_request, EmbeddedRequest, is_get
 from main.models import AppUser
 
@@ -55,10 +55,21 @@ class TViewSingletonWithCustomName(TViewSingleton):
     pass
 
 
+class TStreamingView(View):
+    def get(self, request, *args, **kwargs):
+        def content_generator():
+            yield "chunk1"
+            yield "chunk2"
+            yield "chunk3"
+
+        return StreamingHttpResponse(content_generator())
+
+
 urlpatterns = [
     path("view1/", TView.as_view(), name="view1"),
     path("viewkwargs/", TViewKwargs.as_view(), name="view_kwargs"),
     path("view1/<param1>", TView.as_view(), name="view-param1"),
+    path("streaming/", TStreamingView.as_view(), name="streaming_view"),
     TViewSingleton.create_path(),
     TViewSingletonPathStart.create_path(full_path="full_path"),
     TViewSingletonPathEnd.create_path("path_suffix"),
@@ -196,3 +207,98 @@ def test_viewutils_params(rf: RequestFactory):
     app_user = AppUser.objects.create(username="testuser")
     view = view_from_response(TView, invoke_view(r, "view-param1", kwargs=dict(param1=app_user)))
     assert view.kwargs == {"param1": str(app_user.id)}
+
+
+# #######################################################################
+# ### Streaming Response
+# #######################################################################
+
+
+def test_streaming_response_is_not_processable():
+    response = StreamingHttpResponse(iter(["chunk1", "chunk2"]))
+    assert not is_response_processable(response, "text/html")
+
+
+def test_streaming_response_text_response_to_str_or_none_returns_none():
+    response = StreamingHttpResponse(iter(["chunk1", "chunk2"]))
+    assert text_response_to_str_or_none(response) is None
+
+
+@pytest.mark.urls("hyperpony.views_tests")
+def test_streaming_response_invoke_view(rf: RequestFactory):
+    response = invoke_view(rf.get("/"), "streaming_view")
+    assert response.streaming
+    content = b"".join(response.streaming_content)
+    assert content == b"chunk1chunk2chunk3"
+
+
+@pytest.mark.urls("hyperpony.views_tests")
+def test_streaming_response_process_response(rf: RequestFactory):
+    from hyperpony.response_handler import process_response
+
+    req = rf.get("/")
+    response = invoke_view(req, "streaming_view")
+    processed = process_response(req, response)
+    assert processed.streaming
+    content = b"".join(processed.streaming_content)
+    assert content == b"chunk1chunk2chunk3"
+
+
+@pytest.mark.urls("hyperpony.views_tests")
+def test_streaming_response_process_response_skips_oob_enrichment(rf: RequestFactory):
+    from hyperpony.response_handler import process_response
+
+    req = rf.get("/")
+    response = invoke_view(req, "streaming_view")
+    # OOB enrichment should be skipped for streaming responses
+    processed = process_response(req, response)
+    assert processed.streaming
+    assert not hasattr(processed, "_hyperpony_swap_oob") or not getattr(
+        processed, "_hyperpony_swap_oob", []
+    )
+
+
+def test_streaming_response_swap_oob_raises():
+    from hyperpony.htmx import swap_oob
+
+    response = StreamingHttpResponse(iter(["chunk"]))
+    additional = HttpResponse("<div id='oob'>OOB</div>")
+    with pytest.raises(Exception, match="content type must be text/html"):
+        swap_oob(response, additional)
+
+
+def test_streaming_response_element_wrap_passes_through(rf: RequestFactory):
+    from hyperpony.element import ElementMeta, ElementResponse
+
+    response = StreamingHttpResponse(iter(["chunk1", "chunk2"]))
+    meta = ElementMeta(element_id="test_id", tag="div")
+    wrapped = ElementResponse.wrap(response, meta)
+    # Streaming response should pass through without being wrapped in element tags
+    assert wrapped.streaming
+    content = b"".join(wrapped.streaming_content)
+    assert content == b"chunk1chunk2"
+
+
+def test_streaming_response_with_different_content_type():
+    response = StreamingHttpResponse(iter([b"binary data"]), content_type="application/octet-stream")
+    assert not is_response_processable(response, "text/html")
+    assert text_response_to_str_or_none(response) is None
+
+
+def test_streaming_response_enrich_response_with_oob_contents_skips():
+    from hyperpony.htmx import enrich_response_with_oob_contents
+
+    response = StreamingHttpResponse(iter(["chunk"]))
+    setattr(response, "_hyperpony_swap_oob", [b"<div>oob</div>"])
+    # Should not raise, just skip enrichment
+    enrich_response_with_oob_contents(response)
+    # streaming_content should remain unchanged
+    content = b"".join(response.streaming_content)
+    assert content == b"chunk"
+
+
+def test_streaming_response_via_view_class(rf: RequestFactory):
+    response = TStreamingView.as_view()(rf.get("/"))
+    assert response.streaming
+    content = b"".join(response.streaming_content)
+    assert content == b"chunk1chunk2chunk3"
