@@ -21,7 +21,7 @@ def response_to_str(response: HttpResponseBase | TemplateResponse) -> SafeString
 
 
 def is_response_processable(response: HttpResponseBase, content_type_start: str) -> bool:
-    if isinstance(response, HttpResponse) and response.streaming:
+    if response.streaming:
         return False
 
     if not response["Content-Type"].startswith(content_type_start.lower().strip()):
